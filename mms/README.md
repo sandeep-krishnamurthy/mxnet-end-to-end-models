@@ -46,7 +46,7 @@ Above all for end to end model (In Python script remove pre-processing, point to
 5. Copy the main python file, signature and synset file to the directory(/tmp/resnet18_v1) which we created.It does't require you to provide `symbols` and `params` files locally. 
 
    ```shell
-   gluon_pretrained_image_classification.py signature.json synset.txt /tmp/resnet18_v1/
+   cp gluon_pretrained_image_classification.py signature.json synset.txt /tmp/resnet18_v1/
    ```
 
 6. Create a .mar file by executing below command
