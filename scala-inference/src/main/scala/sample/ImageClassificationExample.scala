@@ -17,17 +17,16 @@
 
 package sample
 
-import org.apache.mxnet.{Context, DType, DataDesc, Shape}
-import org.kohsuke.args4j.{CmdLineParser, Option}
-import org.slf4j.LoggerFactory
-import org.apache.mxnet.infer.{ImageClassifier, _}
 
-import scala.collection.JavaConverters._
 import java.io.File
 import java.net.URL
-import org.apache.commons.io._
 
-import scala.collection.mutable.ListBuffer
+import org.apache.commons.io._
+import org.apache.mxnet._
+import org.apache.mxnet.infer.ImageClassifier
+import org.apache.mxnet.infer.MXNetHandler
+import org.apache.mxnet.infer.Classifier
+
 
 /**
   * Example showing usage of Infer package to do inference on resnet-18 model
@@ -75,18 +74,22 @@ object ImageClassificationExample {
     val (inputImagePath, modelPathPrefix) = downloadModelImage()
 
     val dType = DType.Float32
-    val inputShape = Shape(1, 3, 224, 224)
+    val inputShape = Shape(1, 3, 576, 1024)
     val inputDescriptor = IndexedSeq(DataDesc("data", inputShape, dType, "NCHW"))
 
     // Create object of ImageClassifier class
-    val imgClassifier: ImageClassifier = new
-        ImageClassifier(modelPathPrefix, inputDescriptor, context)
+    val classifier: Classifier = new
+        Classifier(modelPathPrefix, inputDescriptor, context)
 
     // Loading single image from file and getting BufferedImage
     val img = ImageClassifier.loadImageFromFile(inputImagePath)
 
-    // Running inference on single image
-    val output = imgClassifier.classifyImage(img, Some(5))
+    val imageShape = inputShape.drop(1)
+    val pixelsNDArray = ImageClassifier.bufferedImageToPixels(img, imageShape, dType)
+    val imgWithBatchNum = NDArray.api.expand_dims(pixelsNDArray, 0)
+    img.flush()
+
+    val output = classifier.classifyWithNDArray(IndexedSeq(imgWithBatchNum), Some(5))
 
     // Printing top 5 class probabilities
     for (i <- output) {

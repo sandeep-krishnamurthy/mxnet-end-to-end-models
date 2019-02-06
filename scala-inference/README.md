@@ -1,21 +1,48 @@
-# Scala Inference
+# Install Maven package
+```
+sudo apt install maven
+```
+# Add dependency
+```
+<repositories>
+    <repository>
+        <id>Apache Snapshot</id>
+        <url>https://repository.apache.org/content/groups/snapshots</url>
+    </repository>
+</repositories>
+```
+```
+<dependency>
+    <groupId>org.apache.mxnet</groupId>
+    <artifactId>mxnet-full_2.11-osx-x86_64-cpu</artifactId>
+    <version>[1.5.0-SNAPSHOT,)</version>
+</dependency>
+```
+# Install OpenCV
+```
+sudo add-apt-repository ppa:timsc/opencv-3.4
+sudo apt-get update
+sudo apt install libopencv-imgcodecs3.4
+```
 
-Ubuntu v20 or 21 - DL AMI
+## Setup
+You are required to use maven to build the package, by running the following:
+```
+mvn package
+```
 
-Default - Not an End to End Model
+## Run
 
-1. Setup instructions - Gluon-CV, MXNet, Shell scripts
+```Bash
+bash bin/run_im.sh
+```
 
-2. Python script - download pre-trained ResNet18 model which was trained with transforms but model does not contain it as part of sym,params
-
-3. Run tests = shell scripts, Scala file
-
-
-========================
-
-Replace sym, params with the fused one.
-Remove transformations from Scala file and run inference.
-
-=======================
-
-
+If you want to test run on GPU, you can set a environment variable as follows:
+```Bash
+export SCALA_TEST_ON_GPU=1
+```
+## Clean up
+To clean up a Maven package, run the following:
+```Bash
+mvn clean
+```
