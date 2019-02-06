@@ -111,8 +111,8 @@ object EndToEndModelWoPreprocessing {
     }
 
     buf.flush()
-    val img = normalize(result, h, w)
-    img
+
+    normalize(result, h, w)
   }
 
   def normalize(img: Array[Float], h: Int, w: Int): Array[Float] = {
