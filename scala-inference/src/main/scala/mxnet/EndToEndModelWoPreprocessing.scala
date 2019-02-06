@@ -15,24 +15,27 @@
  * limitations under the License.
  */
 
-package sample
+package mxnet
 
 
+import java.awt.image.BufferedImage
 import java.io.File
 import java.net.URL
 
+import javax.imageio.ImageIO
 import org.apache.commons.io._
 import org.apache.mxnet._
 import org.apache.mxnet.infer.ImageClassifier
-import org.apache.mxnet.infer.MXNetHandler
 import org.apache.mxnet.infer.Classifier
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 
 /**
   * Example showing usage of Infer package to do inference on resnet-18 model
   * Follow instructions in README.md to run this example.
   */
-object ImageClassificationExample {
+object EndToEndModelWoPreprocessing {
 
   def downloadUrl(url: String, filePath: String) : Unit = {
     var tmpFile = new File(filePath)
@@ -64,6 +67,77 @@ object ImageClassificationExample {
     (imgPath, tempDirPath + "/resnet18/resnet-18")
   }
 
+  def loadImageFromFile(inputImagePath: String): BufferedImage = {
+    val img = ImageIO.read(new File(inputImagePath))
+    img
+  }
+
+  def reshapeImage(img: BufferedImage, newWidth: Int, newHeight: Int): BufferedImage = {
+    val resizedImage = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_RGB)
+    val g = resizedImage.createGraphics()
+    g.drawImage(img, 0, 0, newWidth, newHeight, null)
+    g.dispose()
+
+    resizedImage
+  }
+
+
+  def imagePreprocess(buf: BufferedImage): Array[Float] = {
+
+    val w = buf.getWidth()
+    val h = buf.getHeight()
+
+    // get an array of integer pixels in the default RGB color mode
+    val pixels = buf.getRGB(0, 0, w, h, null, 0, w)
+
+    // 3 times height and width for R,G,B channels
+    val result = new Array[Float](3 * h * w)
+    var row = 0
+    // copy pixels to array vertically
+    while (row < h) {
+      var col = 0
+      // copy pixels to array horizontally
+      while (col < w) {
+        val rgb = pixels(row * w + col)
+        // getting red color
+        result(0 * h * w + row * w + col) = ((rgb >> 16) & 0xFF) / 255.0f
+        // getting green color
+        result(1 * h * w + row * w + col) = ((rgb >> 8) & 0xFF) / 255.0f
+        // getting blue color
+        result(2 * h * w + row * w + col) = (rgb & 0xFF) / 255.0f
+        col += 1
+      }
+      row += 1
+    }
+
+    buf.flush()
+    val img = normalize(result, h, w)
+    img
+  }
+
+  def normalize(img: Array[Float], h: Int, w: Int): Array[Float] = {
+    val mean = Array(0.485f, 0.456f, 0.406f)
+    val std = Array(0.229f, 0.224f, 0.225f)
+
+    var row = 0
+    // copy pixels to array vertically
+    while (row < h) {
+      var col = 0
+      // copy pixels to array horizontally
+      while (col < w) { // getting red color
+        img(0 * h * w + row * w + col) = (img(0 * h * w + row * w + col) - mean(0)) / std(0)
+        // getting green color
+        img(1 * h * w + row * w + col) = (img(1 * h * w + row * w + col) - mean(1)) / std(1)
+        // getting blue color
+        img(2 * h * w + row * w + col) = (img(2 * h * w + row * w + col) - mean(2)) / std(2)
+        col += 1
+      }
+      row += 1
+    }
+    img
+  }
+
+
   def main(args: Array[String]): Unit = {
 
     var context = Context.cpu()
@@ -74,7 +148,7 @@ object ImageClassificationExample {
     val (inputImagePath, modelPathPrefix) = downloadModelImage()
 
     val dType = DType.Float32
-    val inputShape = Shape(1, 3, 576, 1024)
+    val inputShape = Shape(1, 3, 224, 224)
     val inputDescriptor = IndexedSeq(DataDesc("data", inputShape, dType, "NCHW"))
 
     // Create object of ImageClassifier class
@@ -82,12 +156,12 @@ object ImageClassificationExample {
         Classifier(modelPathPrefix, inputDescriptor, context)
 
     // Loading single image from file and getting BufferedImage
-    val img = ImageClassifier.loadImageFromFile(inputImagePath)
+    val img = loadImageFromFile(inputImagePath)
+    val resizedImg = reshapeImage(img, 224, 224)
+    // Preprocess the image
+    val prepossesedImg = imagePreprocess(resizedImg)
 
-    val imageShape = inputShape.drop(1)
-    val pixelsNDArray = ImageClassifier.bufferedImageToPixels(img, imageShape, dType)
-    val imgWithBatchNum = NDArray.api.expand_dims(pixelsNDArray, 0)
-    img.flush()
+    val imgWithBatchNum = NDArray.array(prepossesedImg, shape = inputShape)
 
     val output = classifier.classifyWithNDArray(IndexedSeq(imgWithBatchNum), Some(5))
 
