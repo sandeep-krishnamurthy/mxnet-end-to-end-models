@@ -25,11 +25,9 @@ import java.net.URL
 import javax.imageio.ImageIO
 import org.apache.commons.io._
 import org.apache.mxnet._
-import org.apache.mxnet.infer.ImageClassifier
 import org.apache.mxnet.infer.Classifier
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
-
+import org.kohsuke.args4j.{CmdLineException, CmdLineParser, Option}
+import collection.JavaConverters._
 
 /**
   * Example showing usage of Infer package to do inference on resnet-18 model
@@ -37,35 +35,17 @@ import org.slf4j.LoggerFactory
   */
 object EndToEndModelWoPreprocessing {
 
-  def downloadUrl(url: String, filePath: String) : Unit = {
-    var tmpFile = new File(filePath)
-    if (!tmpFile.exists()) {
-      FileUtils.copyURLToFile(new URL(url), tmpFile)
-    }
-  }
+  @Option(name = "--model-path-prefix", usage = "input model directory and prefix of the model")
+  private val modelPathPrefix = "/model/resnet18_v1"
+  @Option(name = "--input-image", usage = "the input image")
+  private val inputImagePath = "/images/kitten.jpg"
+  @Option(name = "--input-dir", usage = "the input batch of images directory")
+  private val inputImageDir = "/images/"
+  @Option(name = "--num-runs", usage = "Number of runs")
+  private val numRuns = "1"
+  @Option(name = "--batchsize", usage = "batch size")
+  private val batchsize = "1"
 
-  def downloadModelImage() : (String, String) = {
-    val tempDirPath = System.getProperty("java.io.tmpdir")
-    printf("tempDirPath: %s".format(tempDirPath))
-    val imgPath = tempDirPath + "/inputImages/resnet18/Pug-Cookie.jpg"
-    val imgURL = "https://s3.amazonaws.com/model-server/inputs/Pug-Cookie.jpg"
-    downloadUrl(imgURL, imgPath)
-
-    val baseUrl = "https://s3.us-east-2.amazonaws.com/scala-infer-models"
-    var tmpPath = tempDirPath + "/resnet18/resnet-18-symbol.json"
-    var tmpUrl = baseUrl + "/resnet-18/resnet-18-symbol.json"
-    downloadUrl(tmpUrl, tmpPath)
-
-    tmpPath = tempDirPath + "/resnet18/resnet-18-0000.params"
-    tmpUrl = baseUrl + "/resnet-18/resnet-18-0000.params"
-    downloadUrl(tmpUrl, tmpPath)
-
-    tmpPath = tempDirPath + "/resnet18/synset.txt"
-    tmpUrl = baseUrl + "/resnet-18/synset.txt"
-    downloadUrl(tmpUrl, tmpPath)
-
-    (imgPath, tempDirPath + "/resnet18/resnet-18")
-  }
 
   def loadImageFromFile(inputImagePath: String): BufferedImage = {
     val img = ImageIO.read(new File(inputImagePath))
@@ -137,39 +117,77 @@ object EndToEndModelWoPreprocessing {
     img
   }
 
+  private def percentile(p: Int, seq: Array[Long]) = {
+    scala.util.Sorting.quickSort(seq)
+    val k = Math.ceil(seq.length * (p / 100.0)).toInt
+    seq(k - 1)
+  }
+
+  def printStatistics(inferenceTimesRaw: Array[Long], metricsPrefix: String): Unit = {
+    var inferenceTimes = inferenceTimesRaw
+    // remove head and tail
+    if (inferenceTimes.length > 2) inferenceTimes = inferenceTimesRaw.slice(1, inferenceTimesRaw.length - 1)
+    val p50 = percentile(50, inferenceTimes) / 1.0e6
+    val p99 = percentile(99, inferenceTimes) / 1.0e6
+    val p90 = percentile(90, inferenceTimes) / 1.0e6
+    var sum: Long = 0
+    for (time <- inferenceTimes) {
+      sum += time
+    }
+    val average = sum / (inferenceTimes.length * 1.0e6)
+    println(f"\n$metricsPrefix%s_p99 $p99%fms\n$metricsPrefix%s_p90 $p90%fms\n$metricsPrefix%s_p50 $p50%fms\n$metricsPrefix%s_average $average%1.2fms")
+  }
+
 
   def main(args: Array[String]): Unit = {
+
+    val parser = new CmdLineParser(EndToEndModelWoPreprocessing)
+
+    try {
+      parser.parseArgument(args.toList.asJava)
+    } catch {
+      case e: CmdLineException =>
+        print(s"Error:${e.getMessage}\n Usage:\n")
+        parser.printUsage(System.out)
+        System.exit(1)
+    }
+    val numOfRuns = numRuns.toInt
 
     var context = Context.cpu()
     if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
       System.getenv("SCALA_TEST_ON_GPU").toInt == 1) {
       context = Context.gpu()
     }
-    val (inputImagePath, modelPathPrefix) = downloadModelImage()
 
     val dType = DType.Float32
     val inputShape = Shape(1, 3, 224, 224)
     val inputDescriptor = IndexedSeq(DataDesc("data", inputShape, dType, "NCHW"))
 
     // Create object of ImageClassifier class
-    val classifier: Classifier = new
+    val classifier = new
         Classifier(modelPathPrefix, inputDescriptor, context)
 
-    // Loading single image from file and getting BufferedImage
-    val img = loadImageFromFile(inputImagePath)
-    // Resize the image
-    val resizedImg = reshapeImage(img, 224, 224)
-    // Preprocess the image
-    val prepossesedImg = imagePreprocess(resizedImg)
+    val currTime: Array[Long] = Array.fill(numOfRuns){0}
+    val times: Array[Long] = Array.fill(numOfRuns){0}
+    for (n <- 0 until numOfRuns) {
+      // Loading single image from file and getting BufferedImage
+      val img = loadImageFromFile(inputImagePath)
+      currTime(n) = System.nanoTime()
+      // Resize the image
+      val resizedImg = reshapeImage(img, 224, 224)
+      // Preprocess the image
+      val prepossesedImg = imagePreprocess(resizedImg)
 
-    val imgWithBatchNum = NDArray.array(prepossesedImg, shape = inputShape)
+      val imgWithBatchNum = NDArray.array(prepossesedImg, shape = inputShape)
 
-    val output = classifier.classifyWithNDArray(IndexedSeq(imgWithBatchNum), Some(5))
-
-    // Printing top 5 class probabilities
-    for (i <- output) {
-      printf("Classes with top 5 probability = %s \n", i)
+      val output = classifier.classifyWithNDArray(IndexedSeq(imgWithBatchNum), Some(5))
+      times(n) = System.nanoTime() - currTime(n)
+      // Printing top 5 class probabilities
+      for (i <- output) {
+        printf("Classes with top 5 probability = %s \n", i)
+      }
     }
+    printStatistics(times, "single_inference")
 
   }
 }
