@@ -157,6 +157,7 @@ object EndToEndModelWoPreprocessing {
 
     // Loading single image from file and getting BufferedImage
     val img = loadImageFromFile(inputImagePath)
+    // Resize the image
     val resizedImg = reshapeImage(img, 224, 224)
     // Preprocess the image
     val prepossesedImg = imagePreprocess(resizedImg)

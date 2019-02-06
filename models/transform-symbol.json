@@ -1,0 +1,37 @@
+{
+  "nodes": [
+    {
+      "op": "null", 
+      "name": "data", 
+      "inputs": []
+    }, 
+    {
+      "op": "_image_resize", 
+      "name": "resize0_resize0", 
+      "attrs": {
+        "interp": "1", 
+        "keep_ratio": "False", 
+        "size": "224"
+      }, 
+      "inputs": [[0, 0, 0]]
+    }, 
+    {
+      "op": "_image_to_tensor", 
+      "name": "totensor0_to_tensor0", 
+      "inputs": [[1, 0, 0]]
+    }, 
+    {
+      "op": "_image_normalize", 
+      "name": "normalize0_normalize0", 
+      "attrs": {
+        "mean": "(0.485, 0.456, 0.406)", 
+        "std": "(0.229, 0.224, 0.225)"
+      }, 
+      "inputs": [[2, 0, 0]]
+    }
+  ], 
+  "arg_nodes": [0], 
+  "node_row_ptr": [0, 1, 2, 3, 4], 
+  "heads": [[3, 0, 0]], 
+  "attrs": {"mxnet_version": ["int", 10500]}
+}
