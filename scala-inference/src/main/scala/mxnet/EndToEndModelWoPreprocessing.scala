@@ -22,7 +22,6 @@ import java.awt.image.BufferedImage
 import java.io.File
 
 import javax.imageio.ImageIO
-import org.apache.commons.io._
 import org.apache.mxnet._
 import org.apache.mxnet.infer.Classifier
 import org.kohsuke.args4j.{CmdLineException, CmdLineParser, Option}
@@ -35,8 +34,10 @@ import collection.JavaConverters._
   */
 object EndToEndModelWoPreprocessing {
 
-  @Option(name = "--model-path-prefix", usage = "input model directory and prefix of the model")
-  private val modelPathPrefix = "/model/resnet18_v1"
+  @Option(name = "--model-e2e-path-prefix", usage = "input model directory and prefix of the model")
+  private val modelPathPrefixE2E = "model/resnet18_end_to_end"
+  @Option(name = "--model-non_e2e-path-prefix", usage = "input model directory and prefix of the model")
+  private val modelPathPrefixNonE2E = "model/resnet18_v1"
   @Option(name = "--input-image", usage = "the input image")
   private val inputImagePath = "/images/kitten.jpg"
   @Option(name = "--input-dir", usage = "the input batch of images directory")
@@ -62,7 +63,7 @@ object EndToEndModelWoPreprocessing {
   }
 
 
-  def imagePreprocess(buf: BufferedImage): Array[Float] = {
+  def imagePreprocessJavaWay(buf: BufferedImage): Array[Float] = {
 
     val w = buf.getWidth()
     val h = buf.getHeight()
@@ -74,7 +75,7 @@ object EndToEndModelWoPreprocessing {
     val result = new Array[Float](3 * h * w)
     var row = 0
     // copy pixels to array vertically
-    while (row < h) {
+    while (row < h) { //
       var col = 0
       // copy pixels to array horizontally
       while (col < w) {
@@ -121,6 +122,16 @@ object EndToEndModelWoPreprocessing {
       row += 1
     }
     NDArray.array(result, shape = Shape(1, h, w, 3))
+  }
+
+  def imagePreprocess(arr: NDArray): NDArray = {
+    var resizedImg = Image.imResize(arr, 224, 224)
+    resizedImg = NDArray.api.cast(resizedImg, "float32")
+    resizedImg /= 255
+    val totensorImg = NDArray.api.swapaxes(resizedImg, Some(0), Some(2))
+    val preprocessedImg = (totensorImg - 0.456) / 0.224
+
+    preprocessedImg
   }
 
   def normalize(img: Array[Float], h: Int, w: Int): Array[Float] = {
@@ -187,42 +198,42 @@ object EndToEndModelWoPreprocessing {
       context = Context.gpu()
     }
 
-    val dType = DType.Float32
-    val inputShape = Shape(1, 720, 720, 3)
-    val inputDescriptor = IndexedSeq(DataDesc("data", inputShape, dType, "NCHW"))
+    val inputShapeE2E = Shape(1, 300, 300, 3)
+    val inputDescriptorE2E = IndexedSeq(DataDesc("data", inputShapeE2E, DType.UInt8, "NHWC"))
+    val inputShapeNonE2E = Shape(1, 3, 224, 224)
+    val inputDescriptorNonE2E = IndexedSeq(DataDesc("data", inputShapeNonE2E, DType.Float32, "NCHW"))
 
     // Create object of ImageClassifier class
-    val classifier = new
-        Classifier(modelPathPrefix, inputDescriptor, context)
+    val classifierE2E = new
+        Classifier(modelPathPrefixE2E, inputDescriptorE2E, context)
 
-    val currTime: Array[Long] = Array.fill(numOfRuns){0}
-    val times: Array[Long] = Array.fill(numOfRuns){0}
-    val isE2E = true
+    val classifierNonE2E = new
+        Classifier(modelPathPrefixNonE2E, inputDescriptorNonE2E, context)
+
+    val currTimeE2E: Array[Long] = Array.fill(numOfRuns){0}
+    val currTimeNonE2E: Array[Long] = Array.fill(numOfRuns){0}
+    val timesE2E: Array[Long] = Array.fill(numOfRuns){0}
+    val timesNonE2E: Array[Long] = Array.fill(numOfRuns){0}
+
     for (n <- 0 until numOfRuns) {
-      // Loading single image from file and getting BufferedImage
-      val img = loadImageFromFile(inputImagePath)
-      var imgWithBatchNum:NDArray = null
-      if (isE2E) {
-        currTime(n) = System.nanoTime()
-        imgWithBatchNum = imageToNDArray(img)
-      } else {
-        currTime(n) = System.nanoTime()
-        // Resize the image
-        val resizedImg = reshapeImage(img, 224, 224)
-        // Preprocess the image
-        val prepossesedImg = imagePreprocess(resizedImg)
+      val nd = NDArray.api.random_uniform(Some(0), Some(255), Some(Shape(300, 300, 3)))
+      val img = NDArray.api.cast(nd, "uint8")
+      // E2E
+      currTimeE2E(n) = System.nanoTime()
+      val imgWithBatchNumE2E = NDArray.api.expand_dims(img, 0)
+      val outputE2E = classifierE2E.classifyWithNDArray(IndexedSeq(imgWithBatchNumE2E), Some(5))
+      timesE2E(n) = System.nanoTime() - currTimeE2E(n)
 
-        imgWithBatchNum = NDArray.array(prepossesedImg, inputShape)
-      }
-
-      val output = classifier.classifyWithNDArray(IndexedSeq(imgWithBatchNum), Some(5))
-      times(n) = System.nanoTime() - currTime(n)
-      // Printing top 5 class probabilities
-//      for (i <- output) {
-//        printf("Classes with top 5 probability = %s \n", i)
-//      }
+      // Non E2E
+      currTimeNonE2E(n) = System.nanoTime()
+      val preprocessedImage = imagePreprocess(img)
+      var imgWithBatchNumNonE2E = NDArray.api.expand_dims(preprocessedImage, 0)
+      val outputNonE2E = classifierNonE2E.classifyWithNDArray(IndexedSeq(imgWithBatchNumNonE2E), Some(5))
+      timesNonE2E(n) = System.nanoTime() - currTimeNonE2E(n)
     }
-    printStatistics(times, "single_inference")
-
+    println("E2E")
+    printStatistics(timesE2E, "single_inference")
+    println("Non E2E")
+    printStatistics(timesNonE2E, "single_inference")
   }
 }
