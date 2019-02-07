@@ -159,22 +159,23 @@ object EndToEndModelWoPreprocessing {
   private def percentile(p: Int, seq: Array[Long]) = {
     scala.util.Sorting.quickSort(seq)
     val k = Math.ceil(seq.length * (p / 100.0)).toInt
-    seq(k - 1)
+    seq(k)
   }
 
   def printStatistics(inferenceTimesRaw: Array[Long], metricsPrefix: String): Unit = {
     var inferenceTimes = inferenceTimesRaw
     // remove head and tail
     if (inferenceTimes.length > 2) inferenceTimes = inferenceTimesRaw.slice(1, inferenceTimesRaw.length - 1)
-    val p50 = percentile(50, inferenceTimes) / 1.0e6
-    val p99 = percentile(99, inferenceTimes) / 1.0e6
-    val p90 = percentile(90, inferenceTimes) / 1.0e6
+//    val p50 = percentile(50, inferenceTimes) / 1.0e6
+//    val p99 = percentile(99, inferenceTimes) / 1.0e6
+//    val p90 = percentile(90, inferenceTimes) / 1.0e6
     var sum: Long = 0
     for (time <- inferenceTimes) {
       sum += time
     }
     val average = sum / (inferenceTimes.length * 1.0e6)
-    println(f"\n$metricsPrefix%s_p99 $p99%fms\n$metricsPrefix%s_p90 $p90%fms\n$metricsPrefix%s_p50 $p50%fms\n$metricsPrefix%s_average $average%1.2fms")
+    println(f"$metricsPrefix%s_average $average%1.2fms")
+//    println(f"\n$metricsPrefix%s_p99 $p99%fms\n$metricsPrefix%s_p90 $p90%fms\n$metricsPrefix%s_p50 $p50%fms\n$metricsPrefix%s_average $average%1.2fms")
   }
 
 
