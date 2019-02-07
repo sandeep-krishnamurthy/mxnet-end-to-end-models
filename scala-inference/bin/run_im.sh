@@ -18,4 +18,4 @@
 CURR_DIR=$(cd $(dirname $0)/../; pwd)
 
 CLASSPATH=$CLASSPATH:$CURR_DIR/target/*:$CLASSPATH:$CURR_DIR/target/classes/lib/*
-java -Xmx8G  -cp $CLASSPATH mxnet.EndToEndModelWoPreprocessing --num-runs 1 --model-path-prefix $CURR_DIR/model/resnet18_v1 --input-image $CURR_DIR/images/kitten.jpg
+java -Xmx8G  -cp $CLASSPATH mxnet.EndToEndModelWoPreprocessing --num-runs 100 --model-path-prefix $CURR_DIR/model/resnet18_end_to_end --input-image $CURR_DIR/images/kitten.jpg

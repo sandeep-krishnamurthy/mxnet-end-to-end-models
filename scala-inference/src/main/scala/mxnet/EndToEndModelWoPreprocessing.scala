@@ -20,13 +20,13 @@ package mxnet
 
 import java.awt.image.BufferedImage
 import java.io.File
-import java.net.URL
 
 import javax.imageio.ImageIO
 import org.apache.commons.io._
 import org.apache.mxnet._
 import org.apache.mxnet.infer.Classifier
 import org.kohsuke.args4j.{CmdLineException, CmdLineParser, Option}
+
 import collection.JavaConverters._
 
 /**
@@ -95,6 +95,34 @@ object EndToEndModelWoPreprocessing {
     normalize(result, h, w)
   }
 
+  def imageToNDArray(buf: BufferedImage): NDArray = {
+    val w = buf.getWidth()
+    val h = buf.getHeight()
+    // get an array of integer pixels in the default RGB color mode
+    val pixels = buf.getRGB(0, 0, w, h, null, 0, w)
+
+    // 3 times height and width for R,G,B channels
+    val result = new Array[Float](3 * h * w)
+    var row = 0
+    // copy pixels to array vertically
+    while (row < h) {
+      var col = 0
+      // copy pixels to array horizontally
+      while (col < w) {
+        val rgb = pixels(row * w + col)
+        // getting red color
+        result(row * col + 0) = (rgb >> 16) & 0xFF
+        // getting green color
+        result(row * col + 1) = (rgb >> 8) & 0xFF
+        // getting blue color
+        result(row * col + 2) = rgb & 0xFF
+        col += 1
+      }
+      row += 1
+    }
+    NDArray.array(result, shape = Shape(1, h, w, 3))
+  }
+
   def normalize(img: Array[Float], h: Int, w: Int): Array[Float] = {
     val mean = Array(0.485f, 0.456f, 0.406f)
     val std = Array(0.229f, 0.224f, 0.225f)
@@ -160,7 +188,7 @@ object EndToEndModelWoPreprocessing {
     }
 
     val dType = DType.Float32
-    val inputShape = Shape(1, 3, 224, 224)
+    val inputShape = Shape(1, 720, 720, 3)
     val inputDescriptor = IndexedSeq(DataDesc("data", inputShape, dType, "NCHW"))
 
     // Create object of ImageClassifier class
@@ -169,23 +197,30 @@ object EndToEndModelWoPreprocessing {
 
     val currTime: Array[Long] = Array.fill(numOfRuns){0}
     val times: Array[Long] = Array.fill(numOfRuns){0}
+    val isE2E = true
     for (n <- 0 until numOfRuns) {
       // Loading single image from file and getting BufferedImage
       val img = loadImageFromFile(inputImagePath)
-      currTime(n) = System.nanoTime()
-      // Resize the image
-      val resizedImg = reshapeImage(img, 224, 224)
-      // Preprocess the image
-      val prepossesedImg = imagePreprocess(resizedImg)
+      var imgWithBatchNum:NDArray = null
+      if (isE2E) {
+        currTime(n) = System.nanoTime()
+        imgWithBatchNum = imageToNDArray(img)
+      } else {
+        currTime(n) = System.nanoTime()
+        // Resize the image
+        val resizedImg = reshapeImage(img, 224, 224)
+        // Preprocess the image
+        val prepossesedImg = imagePreprocess(resizedImg)
 
-      val imgWithBatchNum = NDArray.array(prepossesedImg, shape = inputShape)
+        imgWithBatchNum = NDArray.array(prepossesedImg, inputShape)
+      }
 
       val output = classifier.classifyWithNDArray(IndexedSeq(imgWithBatchNum), Some(5))
       times(n) = System.nanoTime() - currTime(n)
       // Printing top 5 class probabilities
-      for (i <- output) {
-        printf("Classes with top 5 probability = %s \n", i)
-      }
+//      for (i <- output) {
+//        printf("Classes with top 5 probability = %s \n", i)
+//      }
     }
     printStatistics(times, "single_inference")
 
