@@ -220,14 +220,23 @@ object EndToEndModelWoPreprocessing {
       val img = NDArray.api.cast(nd, "uint8")
       // E2E
       currTimeE2E(n) = System.nanoTime()
+      if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
+        System.getenv("SCALA_TEST_ON_GPU").toInt == 1) {
+        img.asInContext(Context.gpu())
+      }
       val imgWithBatchNumE2E = NDArray.api.expand_dims(img, 0)
       val outputE2E = classifierE2E.classifyWithNDArray(IndexedSeq(imgWithBatchNumE2E), Some(5))
       timesE2E(n) = System.nanoTime() - currTimeE2E(n)
 
       // Non E2E
+      img.asInContext(Context.cpu())
       currTimeNonE2E(n) = System.nanoTime()
       val preprocessedImage = imagePreprocess(img)
-      var imgWithBatchNumNonE2E = NDArray.api.expand_dims(preprocessedImage, 0)
+      if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
+        System.getenv("SCALA_TEST_ON_GPU").toInt == 1) {
+        preprocessedImage.asInContext(Context.gpu())
+      }
+      val imgWithBatchNumNonE2E = NDArray.api.expand_dims(preprocessedImage, 0)
       val outputNonE2E = classifierNonE2E.classifyWithNDArray(IndexedSeq(imgWithBatchNumNonE2E), Some(5))
       timesNonE2E(n) = System.nanoTime() - currTimeNonE2E(n)
     }
