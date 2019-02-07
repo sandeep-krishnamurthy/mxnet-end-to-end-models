@@ -58,7 +58,7 @@
             <artifactId>mxnet-full_2.11-INTERNAL</artifactId>
             <version>1.5.0</version>
             <scope>system</scope>
-            <systemPath>/Users/leecheng/workspace/incubator-mxnet/scala-package/assembly/target/mxnet-full_2.11-INTERNAL.jar</systemPath>
+            <systemPath>/Users/leecheng/workspace/mxnet-end-to-end-models/scala-inference/target/mxnet-full_2.11-INTERNAL.jar</systemPath>
         </dependency>
         <dependency>
             <groupId>org.scala-lang</groupId>
