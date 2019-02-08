@@ -135,8 +135,6 @@ public class EndToEndModelWoPreprocessing {
             context.add(Context.cpu());
         }
 
-        System.out.println("==========================");
-
         Shape inputShapeE2E = new Shape(new int[]{1, 300, 300, 3});
         Shape inputShapeNonE2E = new Shape(new int[]{1, 3, 224, 224});
         List<DataDesc> inputDescriptorsE2E = new ArrayList<>();
@@ -145,7 +143,6 @@ public class EndToEndModelWoPreprocessing {
         inputDescriptorsNonE2E.add(new DataDesc("data", inputShapeNonE2E, DType.Float32(), "NCHW"));
         Predictor predictorE2E = new Predictor(inst.modelPathPrefixE2E, inputDescriptorsE2E, context,0);
         Predictor predictorNonE2E = new Predictor(inst.modelPathPrefixNonE2E, inputDescriptorsNonE2E, context,0);
-
 
         long[] currTimeE2E = new long[numberOfRuns];
         long[] currTimeNonE2E = new long[numberOfRuns];
