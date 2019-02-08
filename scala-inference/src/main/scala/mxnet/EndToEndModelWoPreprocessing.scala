@@ -217,24 +217,26 @@ object EndToEndModelWoPreprocessing {
     val timesNonE2E: Array[Long] = Array.fill(numOfRuns){0}
 
     for (n <- 0 until numOfRuns) {
-      val nd = NDArray.api.random_uniform(Some(0), Some(255), Some(Shape(300, 300, 3)))
-      val img = NDArray.api.cast(nd, "uint8")
-      // E2E
-      currTimeE2E(n) = System.nanoTime()
-      val imgWithBatchNumE2E = NDArray.api.expand_dims(img, 0)
-      val outputE2E = classifierE2E.classifyWithNDArray(IndexedSeq(imgWithBatchNumE2E), Some(5))
-      timesE2E(n) = System.nanoTime() - currTimeE2E(n)
+      ResourceScope.using() {
+        val nd = NDArray.api.random_uniform(Some(0), Some(255), Some(Shape(300, 300, 3)))
+        val img = NDArray.api.cast(nd, "uint8")
+        // E2E
+        currTimeE2E(n) = System.nanoTime()
+        val imgWithBatchNumE2E = NDArray.api.expand_dims(img, 0)
+        val outputE2E = classifierE2E.classifyWithNDArray(IndexedSeq(imgWithBatchNumE2E), Some(5))
+        timesE2E(n) = System.nanoTime() - currTimeE2E(n)
 
-      // Non E2E
-      currTimeNonE2E(n) = System.nanoTime()
-      val preprocessedImage = imagePreprocess(img)
-      if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
-        System.getenv("SCALA_TEST_ON_GPU").toInt == 1) {
-        preprocessedImage.asInContext(Context.gpu())
+        // Non E2E
+        currTimeNonE2E(n) = System.nanoTime()
+        val preprocessedImage = imagePreprocess(img)
+        if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
+          System.getenv("SCALA_TEST_ON_GPU").toInt == 1) {
+          preprocessedImage.asInContext(Context.gpu())
+        }
+        val imgWithBatchNumNonE2E = NDArray.api.expand_dims(preprocessedImage, 0)
+        val outputNonE2E = classifierNonE2E.classifyWithNDArray(IndexedSeq(imgWithBatchNumNonE2E), Some(5))
+        timesNonE2E(n) = System.nanoTime() - currTimeNonE2E(n)
       }
-      val imgWithBatchNumNonE2E = NDArray.api.expand_dims(preprocessedImage, 0)
-      val outputNonE2E = classifierNonE2E.classifyWithNDArray(IndexedSeq(imgWithBatchNumNonE2E), Some(5))
-      timesNonE2E(n) = System.nanoTime() - currTimeNonE2E(n)
     }
     println("E2E")
     printStatistics(timesE2E, "single_inference")
