@@ -124,7 +124,7 @@ object EndToEndModelWoPreprocessing {
     NDArray.array(result, shape = Shape(1, h, w, 3))
   }
 
-  def imagePreprocess(arr: NDArray): NDArray = {
+  def preprocessImage(arr: NDArray): NDArray = {
     var resizedImg = Image.imResize(arr, 224, 224)
     resizedImg = NDArray.api.cast(resizedImg, "float32")
     resizedImg /= 255
@@ -233,7 +233,7 @@ object EndToEndModelWoPreprocessing {
         // Non E2E
         img.asInContext(Context.cpu())
         currTimeNonE2E(n) = System.nanoTime()
-        val preprocessedImage = imagePreprocess(img)
+        val preprocessedImage = preprocessImage(img)
         if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
           System.getenv("SCALA_TEST_ON_GPU").toInt == 1) {
           preprocessedImage.asInContext(Context.gpu())

@@ -1,139 +1,98 @@
-# JAVA Inference
+# MXNet Java Sample Project
+This is an project created to use Maven-published Scala/Java package with two Java examples.
+## Setup
+You are required to use Maven to build the package with the following commands:
+```
+mvn package
+```
+This command will pick the default values specified in the [pom](https://github.com/apache/incubator-mxnet/blob/master/scala-package/mxnet-demo/java-demo/pom.xml) file.
 
-Ubuntu v20 or 21 - DL AMI
+Note: If you are planning to use GPU, please add `-Dmxnet.profile=linux-x86_64-gpu`
 
-Default - Not an End to End Model
-
-1. Setup instructions - Gluon-CV, MXNet, Shell scripts
-
-2. Python script - download pre-trained ResNet18 model which was trained with transforms but model does not contain it as part of sym,params
-
-3. Run tests =- shell scripts, Java file
-
-
-========================
-
-Replace sym, params with the fused one.
-Remove transformations from Java file and run inference.
-
-=======================
-
-## MXNet Java Image Classification Project
-
-This is a project created to use Maven-published Scala/Java package.
-
-### Steps to run:
-
-1. Build the package using Maven with the following commands
-
-   1. CPU
-
-      ```shell
-      sudo make javaclean
-      sudo make javademo
-      ```
-
-   2. GPU
-
-      ```shell
-      sudo make javaclean
-      sudo make javademo USE_CUDA=1
-      ```
-
-2. Activate virtual Environment
-
-   ```shell
-   source activate mxnet_p36
-   ```
-
-3. Install gluoncv package
-
-   ```shell
-   pip install gluoncv
-   ```
-
-4. Download the pre-trained Resnet_18 hybrid model. Files are saved in `$PROJECT_DIR/models/gluoncv-resnet-18` directory.
-
-   ```shell
-   bash bin/get_gluoncv_resnet_18_data.sh
-   ```
-
-5. Run the test
-
-   1. CPU
-
-   ```shell
-   bash bin/run_gl_ete.sh
-   ```
-
-   2. GPU
-
-   ```shell
-   export SCALA_TEST_ON_GPU=1 USE_GPU=1
-   bash bin/run_gl_ete.sh
-   ```
-
-6. Clean up:
-
-   ```shell
-   sudo make javaclean
-   ```
-
-NOTE:
-
-1. You will find detailed java command list parameter in  `bin/run_gl_ete.sh` file.
-2. The complete java inference code resides in `./src/main/java/mxnet/EndToEndModelWoPreprocessing.java` file.
+### Use customized version set
+You can use the following instruction as an alternative to achieve the same result:
+You may use `mvn package` to build the package,
+using the following commands:
+```Bash
+export SCALA_VERSION_PROFILE=2.11
+export SCALA_PKG_PROFILE=
+mvn package -Dmxnet.profile=$SCALA_PKG_PROFILE \
+		-Dmxnet.scalaprofile=$SCALA_VERSION_PROFILE
+```
+These environment variable (`SCALA_PKG_PROFILE`, `SCALA_VERSION_PROFILE`)
+should be set before executing the line above.
+The `SCALA_PKG_PROFILE` should be chosen from `osx-x86_64-cpu`, `linux-x86_64-cpu` or `linux-x86_64-gpu`.
 
 
+## Run
+### Hello World
+The Scala file is being executed using Java. You can execute the helloWorld example as follows:
+```Bash
+bash bin/java_sample.sh
+```
+You can also run the following command manually:
+```Bash
+java -cp $CLASSPATH sample.HelloWorld
+```
+However, you have to define the Classpath before you run the demo code. More information can be found in the `java_sample.sh`.
+The `CLASSPATH` should point to the jar file you have downloaded.
 
-### ERROR:
+It will load the library automatically and run the example
 
-1. If test failed while executing the java code with:
+In order to use the `Param Object`. We requires user to place this line in the front:
+```
+static NDArray$ NDArray = NDArray$.MODULE$;
+```
+It would help to have the NDArray companion object static and accessable from the outside.
 
-   ```shell
-   SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
-   SLF4J: Defaulting to no-operation (NOP) logger implementation
-   SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
-   ```
-
-**Solution:** Add the below line of code to `pom.xml` file
-
-```xml
-<dependencies>
-    <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-api</artifactId>
-        <version>1.7.5</version>
-    </dependency>
-    <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-log4j12</artifactId>
-        <version>1.7.5</version>
-    </dependency>
-</dependencies>
+### Object Detection using Inference API
+We also provide an example to do object detection, which downloads a ImageNet trained resnet50 model and runs inference on an image to return the classification result as
+```Bash
+Class: car
+Probabilties: 0.99847263
+Coord:312.21335, 72.02908, 456.01443, 150.66176
+Class: bicycle
+Probabilties: 0.9047381
+Coord:155.9581, 149.96365, 383.83694, 418.94516
+Class: dog
+Probabilties: 0.82268167
+Coord:83.82356, 179.14001, 206.63783, 476.78754
 ```
 
- 
-
-2. If test failed while executing the java code with:
-
-   ```shell
-   Exception in thread "main" java.lang.UnsatisfiedLinkError:
-   /tmp/mxnet1613124969478303655/mxnet-scala: libcudart.so.9.2: 
-   cannot open shared object file: No such file or directory
-   ```
-
-   
-
-**Solution:** You have to set the CUDA library path:
-
-```shell
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-9.2/lib64/
-OR
-echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-9.2/lib64/' >> ~/.bashrc
-source ~/.bashrc
+you can run using the command shown below:
+```Bash
+bash bin/run_od.sh
+```
+or the command below as an alternative
+```Bash
+java -cp $CLASSPATH sample.ObjectDetection
 ```
 
-### More Information:
+If you want to test run on GPU, you can set a environment variable as follows:
+```Bash
+export SCALA_TEST_ON_GPU=1
+```
+## Clean up
+Clean up for Maven package is simple:
+```Bash
+mvn clean
+```
 
-1. https://github.com/karan6181/incubator-mxnet/tree/java_inference_ete_model/scala-package/mxnet-demo/java-demo
+## Convert to Eclipse project (Optional)
+You can convert the maven project to the eclipse one by running the following command:
+```
+mvn eclipse:eclipse
+```
+
+## Q & A
+If you are facing opencv issue on Ubuntu, please try as follows to install opencv 3.4 (required by 1.2.0 package and above)
+```Bash
+sudo add-apt-repository ppa:timsc/opencv-3.4
+sudo apt-get update
+sudo apt install libopencv-imgcodecs3.4
+```
+
+Is there any other version available?
+
+You can find nightly release version from [here](https://repository.apache.org/#nexus-search;gav~org.apache.mxnet~~1.5.0-SNAPSHOT~~).
+Please keep the same version in the pom file or [other versions in here](https://repository.apache.org/#nexus-search;gav~org.apache.mxnet~~~~) to run this demo.

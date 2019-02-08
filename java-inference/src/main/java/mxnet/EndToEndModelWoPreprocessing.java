@@ -14,21 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package mxnet;
 
+import org.apache.mxnet.ResourceScope;
+import org.apache.mxnet.javaapi.*;
 import org.apache.mxnet.javaapi.Context;
 import org.apache.mxnet.javaapi.NDArray;
 import org.apache.mxnet.infer.javaapi.Predictor;
-import org.apache.mxnet.javaapi.*;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import javax.imageio.ImageIO;
-import java.awt.Graphics2D;
-import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -36,7 +31,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.LongStream;
 
 
 /**
@@ -46,8 +40,12 @@ import java.util.stream.LongStream;
  * currently available in ObjectDetector class.
  */
 public class EndToEndModelWoPreprocessing {
-    @Option(name = "--model-path-prefix", usage = "input model directory and prefix of the model")
-    private String modelPathPrefix = "/model/ssd_resnet50_512";
+    static NDArray$ NDArray = NDArray$.MODULE$;
+
+    @Option(name = "--model-e2e-path-prefix", usage = "input model directory and prefix of the model")
+    private String modelPathPrefixE2E = "model/resnet18_end_to_end";
+    @Option(name = "--model-non_e2e-path-prefix", usage = "input model directory and prefix of the model")
+    private String modelPathPrefixNonE2E = "model/resnet18_v1";
     @Option(name = "--input-image", usage = "the input image")
     private String inputImagePath = "/images/dog.jpg";
     @Option(name = "--input-dir", usage = "the input batch of images directory")
@@ -57,152 +55,15 @@ public class EndToEndModelWoPreprocessing {
     @Option(name = "--batchsize", usage = "batch size")
     private String batchsize = "1";
 
-    final static Logger logger = LoggerFactory.getLogger(EndToEndModelWoPreprocessing.class);
+    private static NDArray preprocessImage(NDArray nd) {
+        NDArray resizeImg = Image.imResize(nd, 224, 224);
+        resizeImg = NDArray.cast(resizeImg, "float32", null)[0];
+        resizeImg = resizeImg.divInplace(255.0);
+        NDArray totensorImg = (NDArray.swapaxes(NDArray.new swapaxesParam(resizeImg).setDim1(0).setDim2(2)))[0];
+        totensorImg = totensorImg.divInplace(0.456);
+        NDArray preprocessedImg = totensorImg.divInplace(0.224);
 
-    /**
-     * Load the image from file to buffered image
-     * It can be replaced by loadImageFromFile from ObjectDetector
-     * @param inputImagePath input image Path in String
-     * @return Buffered image
-     */
-    private static BufferedImage loadImageFromFile(String inputImagePath) {
-        BufferedImage buf = null;
-        try {
-            buf = ImageIO.read(new File(inputImagePath));
-        } catch (IOException e) {
-            System.err.println(e);
-        }
-        return buf;
-    }
-
-    /**
-     * Load the images from batch of files
-     * @param batchFile List of image file path
-     * @return List of Buffered image
-     */
-    private static List<BufferedImage> loadInputBatch(List<String> batchFile) {
-        List<BufferedImage> listBufferedImage = new ArrayList<>();
-
-        for (String filename : batchFile) {
-            listBufferedImage.add(loadImageFromFile(filename));
-        }
-        return listBufferedImage;
-    }
-
-    /**
-     * Reshape the current image using ImageIO and Graph2D
-     * It can be replaced by reshapeImage from ObjectDetector
-     * @param buf Buffered image
-     * @param newWidth desired width
-     * @param newHeight desired height
-     * @return a reshaped bufferedImage
-     */
-    private static BufferedImage reshapeImage(BufferedImage buf, int newWidth, int newHeight) {
-        BufferedImage resizedImage = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = resizedImage.createGraphics();
-        g.drawImage(buf, 0, 0, newWidth, newHeight, null);
-        g.dispose();
-        return resizedImage;
-    }
-
-    /**
-     * Generate the List of batches of input image file path.
-     * @param inputImageDirPath Input image directory
-     * @param batchSize Batch size
-     * @return List of batches
-     */
-    private static List<List<String>> generateBatches(String inputImageDirPath, int batchSize) {
-        File dir = new File(inputImageDirPath);
-
-        List<List<String>> output = new ArrayList<List<String>>();
-        List<String> batch = new ArrayList<String>();
-        for (File imgFile : dir.listFiles()) {
-            batch.add(imgFile.getPath());
-            if (batch.size() == batchSize) {
-                output.add(batch);
-                batch = new ArrayList<String>();
-            }
-        }
-        if (batch.size() > 0) {
-            output.add(batch);
-        }
-        return output;
-    }
-
-    /**
-     * Convert an image from a buffered image into pixels float array
-     * It can be replaced by bufferedImageToPixels from ObjectDetector
-     * @param buf buffered image
-     * @return Float array
-     */
-    private static float[] imagePreprocess(BufferedImage buf) {
-        // Get height and width of the image
-        int w = buf.getWidth();
-        int h = buf.getHeight();
-
-        // get an array of integer pixels in the default RGB color mode
-        int[] pixels = buf.getRGB(0, 0, w, h, null, 0, w);
-
-        // 3 times height and width for R,G,B channels
-        float[] result = new float[3 * h * w];
-
-        int row = 0;
-        // copy pixels to array vertically
-        while (row < h) {
-            int col = 0;
-            // copy pixels to array horizontally
-            while (col < w) {
-                int rgb = pixels[row * w + col];
-                // getting red color
-                result[0 * h * w + row * w + col] = ((rgb >> 16) & 0xFF) / 255.0f; // 0
-                // getting green color
-                result[1 * h * w + row * w + col] = ((rgb >> 8) & 0xFF) / 255.0f; // 50176
-                // getting blue color
-                result[2 * h * w + row * w + col] = (rgb & 0xFF) / 255.0f; // 100352
-                col += 1;
-            }
-            row += 1;
-        }
-        buf.flush();
-        float[] norm_image = normalizeImage(result);
-        return norm_image;
-    }
-
-    /**
-     * Normalize the image tensor with mean and standard deviation.
-     * @param img Float array
-     * @return Normalized Float array
-     */
-    private static float[] normalizeImage(float[] img) {
-        float[] mean = {0.485f, 0.456f, 0.406f};
-        float[] std = {0.229f, 0.224f, 0.225f};
-
-        int w = 224;
-        int h = 224;
-
-        int row = 0;
-        // copy pixels to array vertically
-        while (row < h) {
-            int col = 0;
-            // copy pixels to array horizontally
-            while (col < w) {
-                // getting red color
-                img[0 * h * w + row * w + col] = (img[0 * h * w + row * w + col] - mean[0]) / std[0];
-                // getting green color
-                img[1 * h * w + row * w + col] = (img[1 * h * w + row * w + col] - mean[1]) / std[1];
-                // getting blue color
-                img[2 * h * w + row * w + col] = (img[2 * h * w + row * w + col] - mean[2]) / std[2];
-                col += 1;
-            }
-            row += 1;
-        }
-        return img;
-    }
-
-    private static long percentile(int p, long[] seq) {
-        Arrays.sort(seq);
-        int k = (int) Math.ceil((seq.length - 1) * (p / 100.0));
-        return seq[k];
+        return preprocessedImg;
     }
 
     private static void printStatistics(long[] inferenceTimesRaw, String metricsPrefix)  {
@@ -212,19 +73,11 @@ public class EndToEndModelWoPreprocessing {
             inferenceTimes = Arrays.copyOfRange(inferenceTimesRaw,
                     1, inferenceTimesRaw.length - 1);
         }
-        double p50 = percentile(50, inferenceTimes) / 1.0e6;
-        double p99 = percentile(99, inferenceTimes) / 1.0e6;
-        double p90 = percentile(90, inferenceTimes) / 1.0e6;
         long sum = 0;
         for (long time: inferenceTimes) sum += time;
         double average = sum / (inferenceTimes.length * 1.0e6);
 
-        System.out.println(
-                String.format("\n%s_p99 %fms\n%s_p90 %fms\n%s_p50 %fms\n%s_average %1.2fms",
-                        metricsPrefix, p99, metricsPrefix, p90,
-                        metricsPrefix, p50, metricsPrefix, average)
-        );
-
+        System.out.println(String.format("%s_average %1.2fms",metricsPrefix, average));
     }
 
     /**
@@ -247,7 +100,7 @@ public class EndToEndModelWoPreprocessing {
         reader.close();
 
         int maxIdx = 0;
-        for (int i = 1;i<probabilities.length;i++) {
+        for (int i = 1;i < probabilities.length; i++) {
             if (probabilities[i] > probabilities[maxIdx]) {
                 maxIdx = i;
             }
@@ -256,25 +109,22 @@ public class EndToEndModelWoPreprocessing {
         return "Probability : " + probabilities[maxIdx] + " Class : " + list.get(maxIdx) ;
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         EndToEndModelWoPreprocessing inst = new EndToEndModelWoPreprocessing();
         CmdLineParser parser  = new CmdLineParser(inst);
         try {
             parser.parseArgument(args);
         } catch (Exception e) {
-            logger.error(e.getMessage(), e);
+            System.out.println(e.getMessage());
             parser.printUsage(System.err);
             System.exit(1);
         }
 
-	boolean useBatch = false;
-	int batchSize = Integer.parseInt(inst.batchsize);
-        // int batchSize = 10;
-	int numberOfRuns = Integer.parseInt(inst.numRuns);
-        // int numberOfRuns = 1;
+        int batchSize = Integer.parseInt(inst.batchsize);
+        int numberOfRuns = Integer.parseInt(inst.numRuns);
+
         String imgPath = inst.inputImagePath;
         String imgDir = inst.inputImageDir;
-
 
         // Prepare the model
         List<Context> context = new ArrayList<Context>();
@@ -285,64 +135,64 @@ public class EndToEndModelWoPreprocessing {
             context.add(Context.cpu());
         }
 
-        Shape inputShape = new Shape(new int[]{1, 3, 224, 224});
-        List<DataDesc> inputDescriptors = new ArrayList<DataDesc>();
-        inputDescriptors.add(new DataDesc("data", inputShape, DType.Float32(), "NCHW"));
-        Predictor predictor = new Predictor(inst.modelPathPrefix, inputDescriptors, context,0);
+        System.out.println("==========================");
+
+        Shape inputShapeE2E = new Shape(new int[]{1, 300, 300, 3});
+        Shape inputShapeNonE2E = new Shape(new int[]{1, 3, 224, 224});
+        List<DataDesc> inputDescriptorsE2E = new ArrayList<>();
+        List<DataDesc> inputDescriptorsNonE2E = new ArrayList<>();
+        inputDescriptorsE2E.add(new DataDesc("data", inputShapeE2E, DType.UInt8(), "NHWC"));
+        inputDescriptorsNonE2E.add(new DataDesc("data", inputShapeNonE2E, DType.Float32(), "NCHW"));
+        Predictor predictorE2E = new Predictor(inst.modelPathPrefixE2E, inputDescriptorsE2E, context,0);
+        Predictor predictorNonE2E = new Predictor(inst.modelPathPrefixNonE2E, inputDescriptorsNonE2E, context,0);
 
 
-        if(useBatch) {
+        long[] currTimeE2E = new long[numberOfRuns];
+        long[] currTimeNonE2E = new long[numberOfRuns];
+        long[] timesE2E = new long[numberOfRuns];
+        long[] timesNonE2E = new long[numberOfRuns];
 
-            // Loading batch of images from the directory path
-            List<List<String>> batchFiles = generateBatches(imgDir, batchSize);
-            long[] infTime = new long[numberOfRuns];
-            long[] batchTime = new long[batchFiles.size()];
-            for (int i = 0; i < numberOfRuns; i++) {
-                for (int j = 0; j < batchFiles.size(); j++) {
-                    List<BufferedImage> imgList = loadInputBatch(batchFiles.get(j));
-                    NDArray[] array = new NDArray[imgList.size()];
-                    List<NDArray> listImageTensor = new ArrayList<>();
-                    for (int k = 0; k < imgList.size(); k++) {
-                        BufferedImage img = reshapeImage(imgList.get(k), 224, 224);
-                        NDArray nd = new NDArray(
-                                imagePreprocess(img), inputShape, Context.cpu());
-                        array[k] = nd;
-                    }
-
-                    NDArray[] arr2 = NDArray.concat(array, array.length, 0, null);
-                    listImageTensor.add(arr2[0]);
-                    arr2[0].waitToRead();
-
-                    long currTime = System.nanoTime();
-                    List<NDArray> res = predictor.predictWithNDArray(listImageTensor);
-                    res.get(0).waitToRead();
-                    batchTime[i] = System.nanoTime() - currTime;
-                    System.out.println("Inference time at iteration: " + i + " and batch: " + j + " is : " + (batchTime[i] / 1.0e6) + "\n");
+        for (int n = 0; n < numberOfRuns; n++) {
+            try (ResourceScope scope = new ResourceScope()) {
+                NDArray nd = NDArray.random_uniform(
+                        NDArray.new random_uniformParam()
+                                .setLow(0f)
+                                .setHigh(255f)
+                                .setShape(new Shape(new int[]{300, 300, 3})))[0];
+                NDArray img = NDArray.cast(nd, "uint8", null)[0];
+                //E2E
+                currTimeE2E[n] = System.nanoTime();
+                if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
+                        Integer.valueOf(System.getenv("SCALA_TEST_ON_GPU")) == 1) {
+                    img.asInContext(Context.gpu());
                 }
-                infTime[i] = LongStream.of(batchTime).sum() / batchTime.length;
-            }
-            printStatistics(infTime, "batch_inference");
+                NDArray imgWithBatchNumE2E = NDArray.expand_dims(img, 0, null)[0];
+                List<NDArray> inputE2E = new ArrayList<>();
+                inputE2E.add(imgWithBatchNumE2E);
 
-        } else {
-            BufferedImage bImg = loadImageFromFile(imgPath);
-            bImg = reshapeImage(bImg, 224, 224);
-            float[] image_tensor = imagePreprocess(bImg);
-            long[] times = new long[numberOfRuns];
+                List<NDArray> resE2E = predictorE2E.predictWithNDArray(inputE2E);
+                resE2E.get(0).waitToRead();
+                timesE2E[n] = System.nanoTime() - currTimeE2E[n];
 
-            for (int i = 0; i < numberOfRuns; i++) {
-                long currTime = System.nanoTime();
-                float[][] result = predictor.predict(new float[][]{image_tensor});
-
-                times[i] = System.nanoTime() - currTime;
-                try {
-                    System.out.println("Inference time at iteration: " + i + " is : " + (times[i] / 1.0e6) + "\n");
-                    System.out.println(printMaximumClass(result[0], inst.modelPathPrefix));
-                } catch (IOException e) {
-                    System.err.println(e);
+                // Non E2E
+                img.asInContext(Context.cpu());
+                currTimeNonE2E[n] = System.nanoTime();
+                NDArray preprocessedImage = preprocessImage(img);
+                if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
+                        Integer.valueOf(System.getenv("SCALA_TEST_ON_GPU")) == 1) {
+                    preprocessedImage.asInContext(Context.gpu());
                 }
+                NDArray imgWithBatchNumNonE2E = NDArray.expand_dims(preprocessedImage, 0, null)[0];
+                List<NDArray> inputNonE2E = new ArrayList<>();
+                inputNonE2E.add(imgWithBatchNumNonE2E);
+                List<NDArray> resNonE2E = predictorNonE2E.predictWithNDArray(inputNonE2E);
+                resNonE2E.get(0).waitToRead();
+                timesNonE2E[n] = System.nanoTime() - currTimeNonE2E[n];
             }
-            printStatistics(times, "single_inference");
         }
+        System.out.println("E2E");
+        printStatistics(timesE2E, "single_inference");
+        System.out.println("Non E2E");
+        printStatistics(timesNonE2E, "single_inference");
     }
-
 }
