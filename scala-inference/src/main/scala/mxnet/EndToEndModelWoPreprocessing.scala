@@ -121,28 +121,30 @@ object EndToEndModelWoPreprocessing {
   }
 
   def preprocessImage(nd: NDArray, isBatch: Boolean): NDArray = {
-    var resizedImg: NDArray = null
-    if (isBatch) {
-      val arr: Array[NDArray] = new Array[NDArray](nd.shape.get(0))
-      for (i <- 0 until nd.shape.get(0)) {
-        arr(i) = Image.imResize(nd.at(i), 224, 224)
+    ResourceScope.using() {
+      var resizedImg: NDArray = null
+      if (isBatch) {
+        val arr: Array[NDArray] = new Array[NDArray](nd.shape.get(0))
+        for (i <- 0 until nd.shape.get(0)) {
+          arr(i) = Image.imResize(nd.at(i), 224, 224)
+        }
+        resizedImg = NDArray.api.stack(arr, Some(0), arr.length)
+      } else {
+        resizedImg = Image.imResize(nd, 224, 224)
       }
-      resizedImg = NDArray.api.stack(arr, Some(0), arr.length)
-    } else {
-      resizedImg = Image.imResize(nd, 224, 224)
-    }
 
-    resizedImg = NDArray.api.cast(resizedImg, "float32")
-    resizedImg /= 255
-    var totensorImg: NDArray = null
-    if (isBatch) {
-      totensorImg = NDArray.api.swapaxes(resizedImg, Some(1), Some(3))
-    } else {
-      totensorImg = NDArray.api.swapaxes(resizedImg, Some(0), Some(2))
-    }
-    val preprocessedImg = (totensorImg - 0.456) / 0.224
+      resizedImg = NDArray.api.cast(resizedImg, "float32")
+      resizedImg /= 255
+      var totensorImg: NDArray = null
+      if (isBatch) {
+        totensorImg = NDArray.api.swapaxes(resizedImg, Some(1), Some(3))
+      } else {
+        totensorImg = NDArray.api.swapaxes(resizedImg, Some(0), Some(2))
+      }
+      val preprocessedImg = (totensorImg - 0.456) / 0.224
 
-    preprocessedImg
+      preprocessedImg
+    }
   }
 
   def normalize(img: Array[Float], h: Int, w: Int): Array[Float] = {
