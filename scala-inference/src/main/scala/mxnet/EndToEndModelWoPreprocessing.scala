@@ -38,14 +38,10 @@ object EndToEndModelWoPreprocessing {
   private val modelPathPrefixE2E = "model/resnet18_end_to_end"
   @Option(name = "--model-non_e2e-path-prefix", usage = "input model directory and prefix of the model")
   private val modelPathPrefixNonE2E = "model/resnet18_v1"
-  @Option(name = "--input-image", usage = "the input image")
-  private val inputImagePath = "/images/kitten.jpg"
-  @Option(name = "--input-dir", usage = "the input batch of images directory")
-  private val inputImageDir = "/images/"
   @Option(name = "--num-runs", usage = "Number of runs")
   private val numRuns = "1"
-  @Option(name = "--batchsize", usage = "batch size")
-  private val batchsize = "1"
+  @Option(name = "--use-batch", usage = "flag to use batch inference")
+  private val batchFlag = "false"
 
 
   def loadImageFromFile(inputImagePath: String): BufferedImage = {
@@ -124,11 +120,26 @@ object EndToEndModelWoPreprocessing {
     NDArray.array(result, shape = Shape(1, h, w, 3))
   }
 
-  def preprocessImage(arr: NDArray): NDArray = {
-    var resizedImg = Image.imResize(arr, 224, 224)
+  def preprocessImage(nd: NDArray, isBatch: Boolean): NDArray = {
+    var resizedImg: NDArray = null
+    if (isBatch) {
+      val arr:Array[NDArray] = new Array[NDArray](nd.shape.get(0))
+      for (i <- 0 until nd.shape.get(0)) {
+        arr :+ Image.imResize(nd.at(i), 224, 224)
+        resizedImg = NDArray.api.concat(arr, arr.length, Some(0))
+      }
+    } else {
+      resizedImg = Image.imResize(nd, 224, 224)
+    }
+
     resizedImg = NDArray.api.cast(resizedImg, "float32")
     resizedImg /= 255
-    val totensorImg = NDArray.api.swapaxes(resizedImg, Some(0), Some(2))
+    var totensorImg: NDArray = null
+    if (isBatch) {
+      totensorImg = NDArray.api.swapaxes(resizedImg, Some(1), Some(3))
+    } else {
+      totensorImg = NDArray.api.swapaxes(resizedImg, Some(0), Some(2))
+    }
     val preprocessedImg = (totensorImg - 0.456) / 0.224
 
     preprocessedImg
@@ -156,28 +167,17 @@ object EndToEndModelWoPreprocessing {
     img
   }
 
-  private def percentile(p: Int, seq: Array[Long]) = {
-    scala.util.Sorting.quickSort(seq)
-    val k = Math.ceil(seq.length * (p / 100.0)).toInt
-    seq(k)
-  }
-
   def printStatistics(inferenceTimesRaw: Array[Long], metricsPrefix: String): Unit = {
     var inferenceTimes = inferenceTimesRaw
     // remove head and tail
     if (inferenceTimes.length > 2) inferenceTimes = inferenceTimesRaw.slice(1, inferenceTimesRaw.length - 1)
-//    val p50 = percentile(50, inferenceTimes) / 1.0e6
-//    val p99 = percentile(99, inferenceTimes) / 1.0e6
-//    val p90 = percentile(90, inferenceTimes) / 1.0e6
     var sum: Long = 0
     for (time <- inferenceTimes) {
       sum += time
     }
     val average = sum / (inferenceTimes.length * 1.0e6)
     println(f"$metricsPrefix%s_average $average%1.2fms")
-//    println(f"\n$metricsPrefix%s_p99 $p99%fms\n$metricsPrefix%s_p90 $p90%fms\n$metricsPrefix%s_p50 $p50%fms\n$metricsPrefix%s_average $average%1.2fms")
   }
-
 
   def main(args: Array[String]): Unit = {
 
@@ -192,6 +192,7 @@ object EndToEndModelWoPreprocessing {
         System.exit(1)
     }
     val numOfRuns = numRuns.toInt
+    val isBatch = batchFlag.toBoolean
 
     var context = Context.cpu()
     if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
@@ -218,7 +219,13 @@ object EndToEndModelWoPreprocessing {
 
     for (n <- 0 until numOfRuns) {
       ResourceScope.using() {
-        val nd = NDArray.api.random_uniform(Some(0), Some(255), Some(Shape(300, 300, 3)))
+        var nd:NDArray = null
+        if (isBatch) {
+          nd = NDArray.api.random_uniform(Some(0), Some(255), Some(Shape(25, 300, 300, 3)))
+        } else {
+          nd = NDArray.api.random_uniform(Some(0), Some(255), Some(Shape(300, 300, 3)))
+        }
+
         val img = NDArray.api.cast(nd, "uint8")
         // E2E
         currTimeE2E(n) = System.nanoTime()
@@ -226,19 +233,30 @@ object EndToEndModelWoPreprocessing {
           System.getenv("SCALA_TEST_ON_GPU").toInt == 1) {
           img.asInContext(Context.gpu())
         }
-        val imgWithBatchNumE2E = NDArray.api.expand_dims(img, 0)
+        var imgWithBatchNumE2E:NDArray = null
+        if (isBatch) {
+          imgWithBatchNumE2E = img
+        } else {
+          imgWithBatchNumE2E = NDArray.api.expand_dims(img, 0)
+        }
+
         val outputE2E = classifierE2E.classifyWithNDArray(IndexedSeq(imgWithBatchNumE2E), Some(5))
         timesE2E(n) = System.nanoTime() - currTimeE2E(n)
 
         // Non E2E
         img.asInContext(Context.cpu())
         currTimeNonE2E(n) = System.nanoTime()
-        val preprocessedImage = preprocessImage(img)
+        val preprocessedImage = preprocessImage(img, isBatch)
         if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
           System.getenv("SCALA_TEST_ON_GPU").toInt == 1) {
           preprocessedImage.asInContext(Context.gpu())
         }
-        val imgWithBatchNumNonE2E = NDArray.api.expand_dims(preprocessedImage, 0)
+        var imgWithBatchNumNonE2E: NDArray = null
+        if (isBatch) {
+          imgWithBatchNumNonE2E = preprocessedImage
+        } else {
+          imgWithBatchNumNonE2E = NDArray.api.expand_dims(preprocessedImage, 0)
+        }
         val outputNonE2E = classifierNonE2E.classifyWithNDArray(IndexedSeq(imgWithBatchNumNonE2E), Some(5))
         timesNonE2E(n) = System.nanoTime() - currTimeNonE2E(n)
       }
