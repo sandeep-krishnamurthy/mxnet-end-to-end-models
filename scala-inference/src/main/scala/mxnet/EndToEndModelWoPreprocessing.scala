@@ -123,11 +123,11 @@ object EndToEndModelWoPreprocessing {
   def preprocessImage(nd: NDArray, isBatch: Boolean): NDArray = {
     var resizedImg: NDArray = null
     if (isBatch) {
-      val arr:Array[NDArray] = new Array[NDArray](nd.shape.get(0))
+      val arr: Array[NDArray] = new Array[NDArray](nd.shape.get(0))
       for (i <- 0 until nd.shape.get(0)) {
-        arr :+ Image.imResize(nd.at(i), 224, 224)
-        resizedImg = NDArray.api.concat(arr, arr.length, Some(0))
+        arr(i) = Image.imResize(nd.at(i), 224, 224)
       }
+      resizedImg = NDArray.api.stack(arr, Some(0), arr.length)
     } else {
       resizedImg = Image.imResize(nd, 224, 224)
     }
