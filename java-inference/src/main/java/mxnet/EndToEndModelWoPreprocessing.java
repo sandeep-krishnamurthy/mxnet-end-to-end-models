@@ -207,7 +207,7 @@ public class EndToEndModelWoPreprocessing {
                 // Non E2E
                 img.asInContext(Context.cpu());
                 currTimeNonE2E[n] = System.nanoTime();
-                NDArray preprocessedImage = preprocessImage(img);
+                NDArray preprocessedImage = preprocessImage(img, isBatch);
                 if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
                         Integer.valueOf(System.getenv("SCALA_TEST_ON_GPU")) == 1) {
                     preprocessedImage.asInContext(Context.gpu());
