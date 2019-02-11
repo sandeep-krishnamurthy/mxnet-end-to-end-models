@@ -262,6 +262,12 @@ object EndToEndModelWoPreprocessing {
         val outputNonE2E = classifierNonE2E.classifyWithNDArray(IndexedSeq(imgWithBatchNumNonE2E), Some(5))
         timesNonE2E(n) = System.nanoTime() - currTimeNonE2E(n)
 
+        nd.dispose()
+        img.dispose()
+        imgWithBatchNumE2E.dispose()
+        preprocessedImage.dispose()
+        imgWithBatchNumNonE2E.dispose()
+        
       }
     }
     println("E2E")
