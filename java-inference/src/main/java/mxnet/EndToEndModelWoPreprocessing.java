@@ -16,6 +16,7 @@
  */
 package mxnet;
 
+import com.sun.org.apache.xpath.internal.operations.Bool;
 import org.apache.mxnet.ResourceScope;
 import org.apache.mxnet.javaapi.*;
 import org.apache.mxnet.javaapi.Context;
@@ -54,12 +55,29 @@ public class EndToEndModelWoPreprocessing {
     private String numRuns = "1";
     @Option(name = "--batchsize", usage = "batch size")
     private String batchsize = "1";
+    @Option(name = "--use-batch", usage = "flag to use batch inference")
+    private String batchFlag = "false";
 
-    private static NDArray preprocessImage(NDArray nd) {
-        NDArray resizeImg = Image.imResize(nd, 224, 224);
+    private static NDArray preprocessImage(NDArray nd, boolean isBatch) {
+        NDArray resizeImg;
+        if (isBatch) {
+            NDArray[] arr = new NDArray[nd.shape().get(0)];
+            for (int i = 0; i < nd.shape().get(0)) {
+                arr[i] = Image.imResize(nd.at(i), 224, 224));
+            }
+            resizeImg = NDArray.stack(arr, 0, arr.length, null)[0];
+        } else {
+            resizeImg = Image.imResize(nd, 224, 224);
+        }
+
         resizeImg = NDArray.cast(resizeImg, "float32", null)[0];
         resizeImg = resizeImg.divInplace(255.0);
-        NDArray totensorImg = (NDArray.swapaxes(NDArray.new swapaxesParam(resizeImg).setDim1(0).setDim2(2)))[0];
+        NDArray totensorImg;
+        if (isBatch) {
+            totensorImg = (NDArray.swapaxes(NDArray.new swapaxesParam(resizeImg).setDim1(1).setDim2(3)))[0];
+        } else {
+            totensorImg = (NDArray.swapaxes(NDArray.new swapaxesParam(resizeImg).setDim1(0).setDim2(2)))[0];
+        }
         totensorImg = totensorImg.divInplace(0.456);
         NDArray preprocessedImg = totensorImg.divInplace(0.224);
 
@@ -125,6 +143,7 @@ public class EndToEndModelWoPreprocessing {
 
         String imgPath = inst.inputImagePath;
         String imgDir = inst.inputImageDir;
+        boolean isBatch = Boolean.parseBoolean(inst.batchFlag;
 
         // Prepare the model
         List<Context> context = new ArrayList<Context>();
@@ -151,11 +170,20 @@ public class EndToEndModelWoPreprocessing {
 
         for (int n = 0; n < numberOfRuns; n++) {
             try (ResourceScope scope = new ResourceScope()) {
-                NDArray nd = NDArray.random_uniform(
-                        NDArray.new random_uniformParam()
-                                .setLow(0f)
-                                .setHigh(255f)
-                                .setShape(new Shape(new int[]{300, 300, 3})))[0];
+                NDArray nd;
+                if (isBatch) {
+                    nd = NDArray.random_uniform(
+                            NDArray.new random_uniformParam()
+                                    .setLow(0f)
+                                    .setHigh(255f)
+                                    .setShape(new Shape(new int[]{10, 300, 300, 3})))[0];
+                } else {
+                    nd = NDArray.random_uniform(
+                            NDArray.new random_uniformParam()
+                                    .setLow(0f)
+                                    .setHigh(255f)
+                                    .setShape(new Shape(new int[]{300, 300, 3})))[0];
+                }
                 NDArray img = NDArray.cast(nd, "uint8", null)[0];
                 //E2E
                 currTimeE2E[n] = System.nanoTime();
@@ -163,7 +191,12 @@ public class EndToEndModelWoPreprocessing {
                         Integer.valueOf(System.getenv("SCALA_TEST_ON_GPU")) == 1) {
                     img.asInContext(Context.gpu());
                 }
-                NDArray imgWithBatchNumE2E = NDArray.expand_dims(img, 0, null)[0];
+                NDArray imgWithBatchNumE2E;
+                if (isBatch) {
+                    imgWithBatchNumE2E = img;
+                } else {
+                    imgWithBatchNumE2E = NDArray.expand_dims(img, 0, null)[0];
+                }
                 List<NDArray> inputE2E = new ArrayList<>();
                 inputE2E.add(imgWithBatchNumE2E);
 
@@ -179,7 +212,12 @@ public class EndToEndModelWoPreprocessing {
                         Integer.valueOf(System.getenv("SCALA_TEST_ON_GPU")) == 1) {
                     preprocessedImage.asInContext(Context.gpu());
                 }
-                NDArray imgWithBatchNumNonE2E = NDArray.expand_dims(preprocessedImage, 0, null)[0];
+                NDArray imgWithBatchNumNonE2E;
+                if (isBatch) {
+                    imgWithBatchNumNonE2E = preprocessedImage;
+                } else {
+                    imgWithBatchNumNonE2E = NDArray.expand_dims(preprocessedImage, 0, null)[0];
+                }
                 List<NDArray> inputNonE2E = new ArrayList<>();
                 inputNonE2E.add(imgWithBatchNumNonE2E);
                 List<NDArray> resNonE2E = predictorNonE2E.predictWithNDArray(inputNonE2E);
