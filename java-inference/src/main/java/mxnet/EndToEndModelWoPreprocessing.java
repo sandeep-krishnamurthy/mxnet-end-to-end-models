@@ -62,7 +62,7 @@ public class EndToEndModelWoPreprocessing {
         NDArray resizeImg;
         if (isBatch) {
             NDArray[] arr = new NDArray[nd.shape().get(0)];
-            for (int i = 0; i < nd.shape().get(0)) {
+            for (int i = 0; i < nd.shape().get(0); i++) {
                 arr[i] = Image.imResize(nd.at(i), 224, 224));
             }
             resizeImg = NDArray.stack(arr, 0, arr.length, null)[0];
@@ -143,7 +143,7 @@ public class EndToEndModelWoPreprocessing {
 
         String imgPath = inst.inputImagePath;
         String imgDir = inst.inputImageDir;
-        boolean isBatch = Boolean.parseBoolean(inst.batchFlag;
+        boolean isBatch = Boolean.parseBoolean(inst.batchFlag);
 
         // Prepare the model
         List<Context> context = new ArrayList<Context>();
