@@ -121,7 +121,7 @@ object EndToEndModelWoPreprocessing {
   }
 
   def preprocessImage(nd: NDArray, isBatch: Boolean): NDArray = {
-    NDArrayCollector.auto() {
+    NDArrayCollector.auto().withScope {
       var resizedImg: NDArray = null
       if (isBatch) {
         val arr: Array[NDArray] = new Array[NDArray](nd.shape.get(0))
@@ -220,7 +220,7 @@ object EndToEndModelWoPreprocessing {
     val timesNonE2E: Array[Long] = Array.fill(numOfRuns){0}
 
     for (n <- 0 until numOfRuns) {
-      NDArrayCollector.auto() {
+      NDArrayCollector.auto().withScope {
         var nd:NDArray = null
         if (isBatch) {
           nd = NDArray.api.random_uniform(Some(0), Some(255), Some(Shape(25, 300, 300, 3)))
