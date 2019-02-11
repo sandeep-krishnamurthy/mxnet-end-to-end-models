@@ -220,7 +220,7 @@ object EndToEndModelWoPreprocessing {
     val timesNonE2E: Array[Long] = Array.fill(numOfRuns){0}
 
     for (n <- 0 until numOfRuns) {
-      ResourceScope.using() {
+      NDArrayCollector.auto() {
         var nd:NDArray = null
         if (isBatch) {
           nd = NDArray.api.random_uniform(Some(0), Some(255), Some(Shape(25, 300, 300, 3)))
@@ -262,12 +262,6 @@ object EndToEndModelWoPreprocessing {
         val outputNonE2E = classifierNonE2E.classifyWithNDArray(IndexedSeq(imgWithBatchNumNonE2E), Some(5))
         timesNonE2E(n) = System.nanoTime() - currTimeNonE2E(n)
 
-        // dispose all the NDArray to save memory
-        nd.dispose()
-        img.dispose()
-        imgWithBatchNumE2E.dispose()
-        preprocessedImage.dispose()
-        imgWithBatchNumNonE2E.dispose()
       }
     }
     println("E2E")
