@@ -57,6 +57,8 @@ public class EndToEndModelWoPreprocessing {
     private String batchsize = "1";
     @Option(name = "--use-batch", usage = "flag to use batch inference")
     private String batchFlag = "false";
+    @Option(name = "--warm-up", usage = "")
+    private String warmUpIter = "25";
 
     private static NDArray preprocessImage(NDArray nd, boolean isBatch) {
         NDArray resizeImg;
@@ -86,11 +88,9 @@ public class EndToEndModelWoPreprocessing {
 
     private static void printStatistics(long[] inferenceTimesRaw, String metricsPrefix)  {
         long[] inferenceTimes = inferenceTimesRaw;
-        // remove head and tail
-        if (inferenceTimes.length > 2) {
-            inferenceTimes = Arrays.copyOfRange(inferenceTimesRaw,
-                    1, inferenceTimesRaw.length - 1);
-        }
+        // remove warmup
+        inferenceTimes = Arrays.copyOfRange(inferenceTimesRaw,
+                    0, inferenceTimesRaw.length);
         long sum = 0;
         for (long time: inferenceTimes) sum += time;
         double average = sum / (inferenceTimes.length * 1.0e6);
@@ -144,6 +144,7 @@ public class EndToEndModelWoPreprocessing {
         String imgPath = inst.inputImagePath;
         String imgDir = inst.inputImageDir;
         boolean isBatch = Boolean.parseBoolean(inst.batchFlag);
+        int timesOfWarmUp = Integer.parseInt(inst.warmUpIter);
 
         // Prepare the model
         List<Context> context = new ArrayList<Context>();
@@ -163,12 +164,12 @@ public class EndToEndModelWoPreprocessing {
         Predictor predictorE2E = new Predictor(inst.modelPathPrefixE2E, inputDescriptorsE2E, context,0);
         Predictor predictorNonE2E = new Predictor(inst.modelPathPrefixNonE2E, inputDescriptorsNonE2E, context,0);
 
-        long[] currTimeE2E = new long[numberOfRuns];
-        long[] currTimeNonE2E = new long[numberOfRuns];
-        long[] timesE2E = new long[numberOfRuns];
-        long[] timesNonE2E = new long[numberOfRuns];
+        long[] currTimeE2E = new long[numberOfRuns + timesOfWarmUp];
+        long[] currTimeNonE2E = new long[numberOfRuns + timesOfWarmUp];
+        long[] timesE2E = new long[numberOfRuns + timesOfWarmUp];
+        long[] timesNonE2E = new long[numberOfRuns + timesOfWarmUp];
 
-        for (int n = 0; n < numberOfRuns; n++) {
+        for (int n = 0; n < numberOfRuns + timesOfWarmUp; n++) {
             try (ResourceScope scope = new ResourceScope()) {
                 NDArray nd;
                 if (isBatch) {

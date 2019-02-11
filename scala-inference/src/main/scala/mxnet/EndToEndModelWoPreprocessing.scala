@@ -74,7 +74,7 @@ object EndToEndModelWoPreprocessing {
 
   def printStatistics(inferenceTimesRaw: Array[Long], metricsPrefix: String, timesOfWarmUp: Int): Unit = {
     var inferenceTimes = inferenceTimesRaw
-    // remove head and tail
+    // remove warmup
     inferenceTimes = inferenceTimesRaw.slice(timesOfWarmUp, inferenceTimesRaw.length)
     var sum: Long = 0
     for (time <- inferenceTimes) {
