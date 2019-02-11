@@ -42,83 +42,8 @@ object EndToEndModelWoPreprocessing {
   private val numRuns = "1"
   @Option(name = "--use-batch", usage = "flag to use batch inference")
   private val batchFlag = "false"
-
-
-  def loadImageFromFile(inputImagePath: String): BufferedImage = {
-    val img = ImageIO.read(new File(inputImagePath))
-    img
-  }
-
-  def reshapeImage(img: BufferedImage, newWidth: Int, newHeight: Int): BufferedImage = {
-    val resizedImage = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_RGB)
-    val g = resizedImage.createGraphics()
-    g.drawImage(img, 0, 0, newWidth, newHeight, null)
-    g.dispose()
-
-    resizedImage
-  }
-
-
-  def imagePreprocessJavaWay(buf: BufferedImage): Array[Float] = {
-
-    val w = buf.getWidth()
-    val h = buf.getHeight()
-
-    // get an array of integer pixels in the default RGB color mode
-    val pixels = buf.getRGB(0, 0, w, h, null, 0, w)
-
-    // 3 times height and width for R,G,B channels
-    val result = new Array[Float](3 * h * w)
-    var row = 0
-    // copy pixels to array vertically
-    while (row < h) { //
-      var col = 0
-      // copy pixels to array horizontally
-      while (col < w) {
-        val rgb = pixels(row * w + col)
-        // getting red color
-        result(0 * h * w + row * w + col) = ((rgb >> 16) & 0xFF) / 255.0f
-        // getting green color
-        result(1 * h * w + row * w + col) = ((rgb >> 8) & 0xFF) / 255.0f
-        // getting blue color
-        result(2 * h * w + row * w + col) = (rgb & 0xFF) / 255.0f
-        col += 1
-      }
-      row += 1
-    }
-
-    buf.flush()
-
-    normalize(result, h, w)
-  }
-
-  def imageToNDArray(buf: BufferedImage): NDArray = {
-    val w = buf.getWidth()
-    val h = buf.getHeight()
-    // get an array of integer pixels in the default RGB color mode
-    val pixels = buf.getRGB(0, 0, w, h, null, 0, w)
-
-    // 3 times height and width for R,G,B channels
-    val result = new Array[Float](3 * h * w)
-    var row = 0
-    // copy pixels to array vertically
-    while (row < h) {
-      var col = 0
-      // copy pixels to array horizontally
-      while (col < w) {
-        val rgb = pixels(row * w + col)
-        // getting red color
-        result(row * col + 0) = (rgb >> 16) & 0xFF
-        // getting green color
-        result(row * col + 1) = (rgb >> 8) & 0xFF
-        // getting blue color
-        result(row * col + 2) = rgb & 0xFF
-        col += 1
-      }
-      row += 1
-    }
-    NDArray.array(result, shape = Shape(1, h, w, 3))
-  }
+  @Option(name = "--warm-up", usage = "")
+  private val warmUpIter = "25"
 
   def preprocessImage(nd: NDArray, isBatch: Boolean): NDArray = {
     ResourceScope.using() {
@@ -141,40 +66,16 @@ object EndToEndModelWoPreprocessing {
       } else {
         totensorImg = NDArray.api.swapaxes(resizedImg, Some(0), Some(2))
       }
-      resizedImg.dispose()
       val preprocessedImg = (totensorImg - 0.456) / 0.224
-      totensorImg.dispose()
 
       preprocessedImg
     }
   }
 
-  def normalize(img: Array[Float], h: Int, w: Int): Array[Float] = {
-    val mean = Array(0.485f, 0.456f, 0.406f)
-    val std = Array(0.229f, 0.224f, 0.225f)
-
-    var row = 0
-    // copy pixels to array vertically
-    while (row < h) {
-      var col = 0
-      // copy pixels to array horizontally
-      while (col < w) { // getting red color
-        img(0 * h * w + row * w + col) = (img(0 * h * w + row * w + col) - mean(0)) / std(0)
-        // getting green color
-        img(1 * h * w + row * w + col) = (img(1 * h * w + row * w + col) - mean(1)) / std(1)
-        // getting blue color
-        img(2 * h * w + row * w + col) = (img(2 * h * w + row * w + col) - mean(2)) / std(2)
-        col += 1
-      }
-      row += 1
-    }
-    img
-  }
-
-  def printStatistics(inferenceTimesRaw: Array[Long], metricsPrefix: String): Unit = {
+  def printStatistics(inferenceTimesRaw: Array[Long], metricsPrefix: String, timesOfWarmUp: Int): Unit = {
     var inferenceTimes = inferenceTimesRaw
     // remove head and tail
-    if (inferenceTimes.length > 2) inferenceTimes = inferenceTimesRaw.slice(1, inferenceTimesRaw.length - 1)
+    inferenceTimes = inferenceTimesRaw.slice(timesOfWarmUp, inferenceTimesRaw.length)
     var sum: Long = 0
     for (time <- inferenceTimes) {
       sum += time
@@ -197,6 +98,7 @@ object EndToEndModelWoPreprocessing {
     }
     val numOfRuns = numRuns.toInt
     val isBatch = batchFlag.toBoolean
+    val timesOfWarmUp = warmUpIter.toInt
 
     var context = Context.cpu()
     if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
@@ -216,12 +118,12 @@ object EndToEndModelWoPreprocessing {
     val classifierNonE2E = new
         Classifier(modelPathPrefixNonE2E, inputDescriptorNonE2E, context)
 
-    val currTimeE2E: Array[Long] = Array.fill(numOfRuns){0}
-    val currTimeNonE2E: Array[Long] = Array.fill(numOfRuns){0}
-    val timesE2E: Array[Long] = Array.fill(numOfRuns){0}
-    val timesNonE2E: Array[Long] = Array.fill(numOfRuns){0}
+    val currTimeE2E: Array[Long] = Array.fill(numOfRuns + timesOfWarmUp){0}
+    val currTimeNonE2E: Array[Long] = Array.fill(numOfRuns + timesOfWarmUp){0}
+    val timesE2E: Array[Long] = Array.fill(numOfRuns + timesOfWarmUp){0}
+    val timesNonE2E: Array[Long] = Array.fill(numOfRuns + timesOfWarmUp){0}
 
-    for (n <- 0 until numOfRuns) {
+    for (n <- 0 until numOfRuns + timesOfWarmUp) {
       ResourceScope.using() {
         var nd:NDArray = null
         if (isBatch) {
@@ -231,7 +133,6 @@ object EndToEndModelWoPreprocessing {
         }
 
         val img = NDArray.api.cast(nd, "uint8")
-        nd.dispose()
         // E2E
         currTimeE2E(n) = System.nanoTime()
         if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
@@ -247,13 +148,11 @@ object EndToEndModelWoPreprocessing {
 
         val outputE2E = classifierE2E.classifyWithNDArray(IndexedSeq(imgWithBatchNumE2E), Some(5))
         timesE2E(n) = System.nanoTime() - currTimeE2E(n)
-        imgWithBatchNumE2E.dispose()
 
         // Non E2E
         img.asInContext(Context.cpu())
         currTimeNonE2E(n) = System.nanoTime()
         val preprocessedImage = preprocessImage(img, isBatch)
-        img.dispose()
         if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
           System.getenv("SCALA_TEST_ON_GPU").toInt == 1) {
           preprocessedImage.asInContext(Context.gpu())
@@ -266,12 +165,11 @@ object EndToEndModelWoPreprocessing {
         }
         val outputNonE2E = classifierNonE2E.classifyWithNDArray(IndexedSeq(imgWithBatchNumNonE2E), Some(5))
         timesNonE2E(n) = System.nanoTime() - currTimeNonE2E(n)
-        imgWithBatchNumNonE2E.dispose()
       }
     }
     println("E2E")
-    printStatistics(timesE2E, "single_inference")
+    printStatistics(timesE2E, "single_inference", timesOfWarmUp)
     println("Non E2E")
-    printStatistics(timesNonE2E, "single_inference")
+    printStatistics(timesNonE2E, "single_inference", timesOfWarmUp)
   }
 }
