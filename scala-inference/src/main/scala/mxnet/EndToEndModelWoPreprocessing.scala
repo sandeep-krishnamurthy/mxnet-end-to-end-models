@@ -121,7 +121,7 @@ object EndToEndModelWoPreprocessing {
   }
 
   def preprocessImage(nd: NDArray, isBatch: Boolean): NDArray = {
-    ResourceScope.using() {
+    NDArrayCollector.auto() {
       var resizedImg: NDArray = null
       if (isBatch) {
         val arr: Array[NDArray] = new Array[NDArray](nd.shape.get(0))
