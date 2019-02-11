@@ -121,7 +121,7 @@ object EndToEndModelWoPreprocessing {
   }
 
   def preprocessImage(nd: NDArray, isBatch: Boolean): NDArray = {
-    NDArrayCollector.auto().withScope {
+    ResourceScope.using() {
       var resizedImg: NDArray = null
       if (isBatch) {
         val arr: Array[NDArray] = new Array[NDArray](nd.shape.get(0))
@@ -141,7 +141,9 @@ object EndToEndModelWoPreprocessing {
       } else {
         totensorImg = NDArray.api.swapaxes(resizedImg, Some(0), Some(2))
       }
+      resizedImg.dispose()
       val preprocessedImg = (totensorImg - 0.456) / 0.224
+      totensorImg.dispose()
 
       preprocessedImg
     }
@@ -220,7 +222,7 @@ object EndToEndModelWoPreprocessing {
     val timesNonE2E: Array[Long] = Array.fill(numOfRuns){0}
 
     for (n <- 0 until numOfRuns) {
-      NDArrayCollector.auto().withScope {
+      ResourceScope.using() {
         var nd:NDArray = null
         if (isBatch) {
           nd = NDArray.api.random_uniform(Some(0), Some(255), Some(Shape(25, 300, 300, 3)))
@@ -229,6 +231,7 @@ object EndToEndModelWoPreprocessing {
         }
 
         val img = NDArray.api.cast(nd, "uint8")
+        nd.dispose()
         // E2E
         currTimeE2E(n) = System.nanoTime()
         if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
@@ -244,11 +247,13 @@ object EndToEndModelWoPreprocessing {
 
         val outputE2E = classifierE2E.classifyWithNDArray(IndexedSeq(imgWithBatchNumE2E), Some(5))
         timesE2E(n) = System.nanoTime() - currTimeE2E(n)
+        imgWithBatchNumE2E.dispose()
 
         // Non E2E
         img.asInContext(Context.cpu())
         currTimeNonE2E(n) = System.nanoTime()
         val preprocessedImage = preprocessImage(img, isBatch)
+        img.dispose()
         if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
           System.getenv("SCALA_TEST_ON_GPU").toInt == 1) {
           preprocessedImage.asInContext(Context.gpu())
@@ -261,13 +266,7 @@ object EndToEndModelWoPreprocessing {
         }
         val outputNonE2E = classifierNonE2E.classifyWithNDArray(IndexedSeq(imgWithBatchNumNonE2E), Some(5))
         timesNonE2E(n) = System.nanoTime() - currTimeNonE2E(n)
-
-        nd.dispose()
-        img.dispose()
-        imgWithBatchNumE2E.dispose()
-        preprocessedImage.dispose()
         imgWithBatchNumNonE2E.dispose()
-        
       }
     }
     println("E2E")
