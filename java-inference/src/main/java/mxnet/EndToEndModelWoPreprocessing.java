@@ -16,7 +16,6 @@
  */
 package mxnet;
 
-import com.sun.org.apache.xpath.internal.operations.Bool;
 import org.apache.mxnet.ResourceScope;
 import org.apache.mxnet.javaapi.*;
 import org.apache.mxnet.javaapi.Context;
@@ -25,20 +24,14 @@ import org.apache.mxnet.infer.javaapi.Predictor;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 
 /**
- * This Class is a demo to show how users can use Predictor APIs to do
- * Image Classification with all hand-crafted Pre-processing.
- * All helper functions for image pre-processing are
- * currently available in ObjectDetector class.
+ * Benchmark resnet18 and resnet_end_to_end model for single / batch inference
+ * and CPU / GPU
  */
 public class EndToEndModelWoPreprocessing {
     static NDArray$ NDArray = NDArray$.MODULE$;
@@ -47,19 +40,16 @@ public class EndToEndModelWoPreprocessing {
     private String modelPathPrefixE2E = "model/resnet18_end_to_end";
     @Option(name = "--model-non_e2e-path-prefix", usage = "input model directory and prefix of the model")
     private String modelPathPrefixNonE2E = "model/resnet18_v1";
-    @Option(name = "--input-image", usage = "the input image")
-    private String inputImagePath = "/images/dog.jpg";
-    @Option(name = "--input-dir", usage = "the input batch of images directory")
-    private String inputImageDir = "/images/";
     @Option(name = "--num-runs", usage = "Number of runs")
     private String numRuns = "1";
     @Option(name = "--batchsize", usage = "batch size")
-    private String batchsize = "1";
+    private String batchsize = "25";
     @Option(name = "--use-batch", usage = "flag to use batch inference")
     private String batchFlag = "false";
-    @Option(name = "--warm-up", usage = "")
-    private String warmUpIter = "25";
+    @Option(name = "--warm-up", usage = "warm up iteration")
+    private String warmUpIter = "5";
 
+    // process the image explicitly Resize -> ToTensor -> Normalize
     private static NDArray preprocessImage(NDArray nd, boolean isBatch) {
         NDArray resizeImg;
         if (isBatch) {
@@ -86,45 +76,16 @@ public class EndToEndModelWoPreprocessing {
         return preprocessedImg;
     }
 
-    private static void printStatistics(long[] inferenceTimesRaw, String metricsPrefix)  {
-        long[] inferenceTimes = inferenceTimesRaw;
+    private static void printAvg(long[] inferenceTimesRaw, String metricsPrefix, int timesOfWarmUp)  {
         // remove warmup
-        inferenceTimes = Arrays.copyOfRange(inferenceTimesRaw,
-                    0, inferenceTimesRaw.length);
+        long[] inferenceTimes = Arrays.copyOfRange(inferenceTimesRaw,
+                timesOfWarmUp, inferenceTimesRaw.length);
         long sum = 0;
-        for (long time: inferenceTimes) sum += time;
+        for (long time: inferenceTimes) {
+            sum += time;
+        }
         double average = sum / (inferenceTimes.length * 1.0e6);
-
         System.out.println(String.format("%s_average %1.2fms",metricsPrefix, average));
-    }
-
-    /**
-     * Helper class to print the maximum prediction result
-     * @param probabilities The float array of probability
-     * @param modelPathPrefix model Path needs to load the synset.txt
-     */
-    private static String printMaximumClass(float[] probabilities,
-                                            String modelPathPrefix) throws IOException {
-        String synsetFilePath = modelPathPrefix.substring(0,
-                1 + modelPathPrefix.lastIndexOf(File.separator)) + "/synset.txt";
-        BufferedReader reader = new BufferedReader(new FileReader(synsetFilePath));
-        ArrayList<String> list = new ArrayList<>();
-        String line = reader.readLine();
-
-        while (line != null){
-            list.add(line);
-            line = reader.readLine();
-        }
-        reader.close();
-
-        int maxIdx = 0;
-        for (int i = 1;i < probabilities.length; i++) {
-            if (probabilities[i] > probabilities[maxIdx]) {
-                maxIdx = i;
-            }
-        }
-
-        return "Probability : " + probabilities[maxIdx] + " Class : " + list.get(maxIdx) ;
     }
 
     public static void main(String[] args) {
@@ -141,12 +102,9 @@ public class EndToEndModelWoPreprocessing {
         int batchSize = Integer.parseInt(inst.batchsize);
         int numberOfRuns = Integer.parseInt(inst.numRuns);
 
-        String imgPath = inst.inputImagePath;
-        String imgDir = inst.inputImageDir;
         boolean isBatch = Boolean.parseBoolean(inst.batchFlag);
         int timesOfWarmUp = Integer.parseInt(inst.warmUpIter);
 
-        // Prepare the model
         List<Context> context = new ArrayList<Context>();
         if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
                 Integer.valueOf(System.getenv("SCALA_TEST_ON_GPU")) == 1) {
@@ -177,7 +135,7 @@ public class EndToEndModelWoPreprocessing {
                             NDArray.new random_uniformParam()
                                     .setLow(0f)
                                     .setHigh(255f)
-                                    .setShape(new Shape(new int[]{10, 300, 300, 3})))[0];
+                                    .setShape(new Shape(new int[]{batchSize, 300, 300, 3})))[0];
                 } else {
                     nd = NDArray.random_uniform(
                             NDArray.new random_uniformParam()
@@ -227,8 +185,8 @@ public class EndToEndModelWoPreprocessing {
             }
         }
         System.out.println("E2E");
-        printStatistics(timesE2E, "single_inference");
+        printAvg(timesE2E, (isBatch) ? "batch_inference" : "single_inference", timesOfWarmUp);
         System.out.println("Non E2E");
-        printStatistics(timesNonE2E, "single_inference");
+        printAvg(timesNonE2E, (isBatch) ? "batch_inference" : "single_inference", timesOfWarmUp);
     }
 }

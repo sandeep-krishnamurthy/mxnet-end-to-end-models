@@ -18,10 +18,6 @@
 package mxnet
 
 
-import java.awt.image.BufferedImage
-import java.io.File
-
-import javax.imageio.ImageIO
 import org.apache.mxnet._
 import org.apache.mxnet.infer.Classifier
 import org.kohsuke.args4j.{CmdLineException, CmdLineParser, Option}
@@ -29,8 +25,8 @@ import org.kohsuke.args4j.{CmdLineException, CmdLineParser, Option}
 import collection.JavaConverters._
 
 /**
-  * Example showing usage of Infer package to do inference on resnet-18 model
-  * Follow instructions in README.md to run this example.
+  * Benchmark resnet18 and resnet_end_to_end model for single / batch inference
+  * and CPU / GPU
   */
 object EndToEndModelWoPreprocessing {
 
@@ -40,11 +36,14 @@ object EndToEndModelWoPreprocessing {
   private val modelPathPrefixNonE2E = "model/resnet18_v1"
   @Option(name = "--num-runs", usage = "Number of runs")
   private val numRuns = "1"
+  @Option(name = "--batchsize", usage = "batch size")
+  private val batchsize = "25"
   @Option(name = "--use-batch", usage = "flag to use batch inference")
   private val batchFlag = "false"
-  @Option(name = "--warm-up", usage = "")
-  private val warmUpIter = "25"
+  @Option(name = "--warm-up", usage = "warm up iteration")
+  private val warmUpIter = "5"
 
+  // process the image explicitly Resize -> ToTensor -> Normalize
   def preprocessImage(nd: NDArray, isBatch: Boolean): NDArray = {
     ResourceScope.using() {
       var resizedImg: NDArray = null
@@ -72,10 +71,9 @@ object EndToEndModelWoPreprocessing {
     }
   }
 
-  def printStatistics(inferenceTimesRaw: Array[Long], metricsPrefix: String, timesOfWarmUp: Int): Unit = {
-    var inferenceTimes = inferenceTimesRaw
+  def printAvg(inferenceTimesRaw: Array[Long], metricsPrefix: String, timesOfWarmUp: Int): Unit = {
     // remove warmup
-    inferenceTimes = inferenceTimesRaw.slice(timesOfWarmUp, inferenceTimesRaw.length)
+    val inferenceTimes = inferenceTimesRaw.slice(timesOfWarmUp, inferenceTimesRaw.length)
     var sum: Long = 0
     for (time <- inferenceTimes) {
       sum += time
@@ -99,6 +97,7 @@ object EndToEndModelWoPreprocessing {
     val numOfRuns = numRuns.toInt
     val isBatch = batchFlag.toBoolean
     val timesOfWarmUp = warmUpIter.toInt
+    val batchSize = batchsize.toInt
 
     var context = Context.cpu()
     if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
@@ -127,7 +126,7 @@ object EndToEndModelWoPreprocessing {
       ResourceScope.using() {
         var nd:NDArray = null
         if (isBatch) {
-          nd = NDArray.api.random_uniform(Some(0), Some(255), Some(Shape(25, 300, 300, 3)))
+          nd = NDArray.api.random_uniform(Some(0), Some(255), Some(Shape(batchSize, 300, 300, 3)))
         } else {
           nd = NDArray.api.random_uniform(Some(0), Some(255), Some(Shape(300, 300, 3)))
         }
@@ -168,8 +167,8 @@ object EndToEndModelWoPreprocessing {
       }
     }
     println("E2E")
-    printStatistics(timesE2E, "single_inference", timesOfWarmUp)
+    printAvg(timesE2E, if (isBatch) "batch_inference" else "single_inference", timesOfWarmUp)
     println("Non E2E")
-    printStatistics(timesNonE2E, "single_inference", timesOfWarmUp)
+    printAvg(timesNonE2E, if (isBatch) "batch_inference" else "single_inference", timesOfWarmUp)
   }
 }
