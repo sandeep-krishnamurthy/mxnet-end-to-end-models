@@ -51,32 +51,30 @@ public class EndToEndModelWoPreprocessing {
 
     // process the image explicitly Resize -> ToTensor -> Normalize
     private static NDArray preprocessImage(NDArray nd, boolean isBatch) {
-        try(ResourceScope scope = new ResourceScope()) {
-            NDArray resizeImg;
-            if (isBatch) {
-                NDArray[] arr = new NDArray[nd.shape().get(0)];
-                for (int i = 0; i < nd.shape().get(0); i++) {
-                    arr[i] = Image.imResize(nd.at(i), 224, 224);
-                }
-                resizeImg = NDArray.stack(arr, 0, arr.length, null)[0];
-                arr = null;
-            } else {
-                resizeImg = Image.imResize(nd, 224, 224);
+        NDArray resizeImg;
+        if (isBatch) {
+            NDArray[] arr = new NDArray[nd.shape().get(0)];
+            for (int i = 0; i < nd.shape().get(0); i++) {
+                arr[i] = Image.imResize(nd.at(i), 224, 224);
             }
-
-            resizeImg = NDArray.cast(resizeImg, "float32", null)[0];
-            resizeImg = resizeImg.divInplace(255.0);
-            NDArray totensorImg;
-            if (isBatch) {
-                totensorImg = (NDArray.swapaxes(NDArray.new swapaxesParam(resizeImg).setDim1(1).setDim2(3)))[0];
-            } else {
-                totensorImg = (NDArray.swapaxes(NDArray.new swapaxesParam(resizeImg).setDim1(0).setDim2(2)))[0];
-            }
-            totensorImg = totensorImg.divInplace(0.456);
-            NDArray preprocessedImg = totensorImg.divInplace(0.224);
-
-            return preprocessedImg;
+            resizeImg = NDArray.stack(arr, 0, arr.length, null)[0];
+            arr = null;
+        } else {
+            resizeImg = Image.imResize(nd, 224, 224);
         }
+        
+        resizeImg = NDArray.cast(resizeImg, "float32", null)[0];
+        resizeImg = resizeImg.divInplace(255.0);
+        NDArray totensorImg;
+        if (isBatch) {
+            totensorImg = (NDArray.swapaxes(NDArray.new swapaxesParam(resizeImg).setDim1(1).setDim2(3)))[0];
+        } else {
+            totensorImg = (NDArray.swapaxes(NDArray.new swapaxesParam(resizeImg).setDim1(0).setDim2(2)))[0];
+        }
+        totensorImg = totensorImg.divInplace(0.456);
+        NDArray preprocessedImg = totensorImg.divInplace(0.224);
+
+        return preprocessedImg;
     }
 
     private static void printAvg(long[] inferenceTimesRaw, String metricsPrefix, int timesOfWarmUp)  {
