@@ -109,8 +109,7 @@ object EndToEndModelWoPreprocessing {
     val inputDescriptorE2E = IndexedSeq(DataDesc("data", inputShapeE2E, DType.UInt8, "NHWC"))
     val inputShapeNonE2E = Shape(1, 3, 224, 224)
     val inputDescriptorNonE2E = IndexedSeq(DataDesc("data", inputShapeNonE2E, DType.Float32, "NCHW"))
-
-    // Create object of ImageClassifier class
+    
     val classifierE2E = new
         Classifier(modelPathPrefixE2E, inputDescriptorE2E, context)
 
