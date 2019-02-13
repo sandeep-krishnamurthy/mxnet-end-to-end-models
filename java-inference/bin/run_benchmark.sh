@@ -17,5 +17,4 @@
 #!/bin/bash
 CURR_DIR=$(cd $(dirname $0)/../; pwd)
 CLASSPATH=$CLASSPATH:$CURR_DIR/target/*:$CLASSPATH:$CURR_DIR/target/dependency/*
-echo $CURR_DIR
-java -Xmx8G -cp $CLASSPATH mxnet.EndToEndModelWoPreprocessing --num-runs 100 --batchsize 32 --model-path-prefix $CURR_DIR/models/gluoncv-resnet-18/resnet18_v1 --input-image $CURR_DIR/images/kitten.jpg
+java -Xmx8G  -cp $CLASSPATH mxnet.EndToEndModelWoPreprocessing --num-runs 1000
