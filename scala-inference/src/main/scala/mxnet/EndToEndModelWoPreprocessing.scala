@@ -31,9 +31,9 @@ import collection.JavaConverters._
 object EndToEndModelWoPreprocessing {
 
   @Option(name = "--model-e2e-path-prefix", usage = "input model directory and prefix of the model")
-  private val modelPathPrefixE2E = "model/resnet18_end_to_end"
+  private val modelPathPrefixE2E = "../models/end_to_end_model/resnet18_end_to_end"
   @Option(name = "--model-non_e2e-path-prefix", usage = "input model directory and prefix of the model")
-  private val modelPathPrefixNonE2E = "model/resnet18_v1"
+  private val modelPathPrefixNonE2E = "../models/not_end_to_end_model/resnet18_v1"
   @Option(name = "--num-runs", usage = "Number of runs")
   private val numRuns = "1"
   @Option(name = "--batchsize", usage = "batch size")
