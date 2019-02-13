@@ -62,7 +62,7 @@ public class EndToEndModelWoPreprocessing {
         } else {
             resizeImg = Image.imResize(nd, 224, 224);
         }
-        
+
         resizeImg = NDArray.cast(resizeImg, "float32", null)[0];
         resizeImg = resizeImg.divInplace(255.0);
         NDArray totensorImg;
