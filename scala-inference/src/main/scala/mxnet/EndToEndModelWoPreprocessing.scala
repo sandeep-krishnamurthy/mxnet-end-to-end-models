@@ -31,17 +31,17 @@ import collection.JavaConverters._
 object EndToEndModelWoPreprocessing {
 
   @Option(name = "--model-e2e-path-prefix", usage = "input model directory and prefix of the model")
-  private val modelPathPrefixE2E = "../models/end_to_end_model/resnet18_end_to_end"
+  val modelPathPrefixE2E: String = "../models/end_to_end_model/resnet18_end_to_end"
   @Option(name = "--model-non_e2e-path-prefix", usage = "input model directory and prefix of the model")
-  private val modelPathPrefixNonE2E = "../models/not_end_to_end_model/resnet18_v1"
+  val modelPathPrefixNonE2E: String = "../models/not_end_to_end_model/resnet18_v1"
   @Option(name = "--num-runs", usage = "Number of runs")
-  private val numRuns = "1"
+  val numOfRuns: Int = 1
   @Option(name = "--batchsize", usage = "batch size")
-  private val batchsize = "25"
+  val batchSize: Int = 25
   @Option(name = "--use-batch", usage = "flag to use batch inference")
-  private val batchFlag = "false"
+  val isBatch: Boolean = false
   @Option(name = "--warm-up", usage = "warm up iteration")
-  private val warmUpIter = "5"
+  val timesOfWarmUp: Int = 5
 
   // process the image explicitly Resize -> ToTensor -> Normalize
   def preprocessImage(nd: NDArray, isBatch: Boolean): NDArray = {
@@ -94,10 +94,6 @@ object EndToEndModelWoPreprocessing {
         parser.printUsage(System.out)
         System.exit(1)
     }
-    val numOfRuns = numRuns.toInt
-    val isBatch = batchFlag.toBoolean
-    val timesOfWarmUp = warmUpIter.toInt
-    val batchSize = batchsize.toInt
 
     var context = Context.cpu()
     if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
@@ -148,6 +144,7 @@ object EndToEndModelWoPreprocessing {
         timesE2E(n) = System.nanoTime() - currTimeE2E(n)
 
         // Non E2E
+        // If the img is in GPU, copy back to CPU for preprocess
         img.asInContext(Context.cpu())
         currTimeNonE2E(n) = System.nanoTime()
         val preprocessedImage = preprocessImage(img, isBatch)
