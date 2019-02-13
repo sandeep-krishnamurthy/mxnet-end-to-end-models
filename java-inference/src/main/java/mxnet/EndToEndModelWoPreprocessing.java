@@ -41,13 +41,13 @@ public class EndToEndModelWoPreprocessing {
     @Option(name = "--model-non_e2e-path-prefix", usage = "input model directory and prefix of the model")
     private String modelPathPrefixNonE2E = "../models/not_end_to_end_model/resnet18_v1";
     @Option(name = "--num-runs", usage = "Number of runs")
-    private String numRuns = "1";
+    private int numRuns = 1;
     @Option(name = "--batchsize", usage = "batch size")
-    private String batchsize = "25";
+    private int batchSize = 25;
     @Option(name = "--use-batch", usage = "flag to use batch inference")
-    private String batchFlag = "false";
+    private boolean isBatch = false;
     @Option(name = "--warm-up", usage = "warm up iteration")
-    private String warmUpIter = "5";
+    private int warmUpIter = 5;
 
     // process the image explicitly Resize -> ToTensor -> Normalize
     private static NDArray preprocessImage(NDArray nd, boolean isBatch) {
@@ -100,12 +100,6 @@ public class EndToEndModelWoPreprocessing {
             System.exit(1);
         }
 
-        int batchSize = Integer.parseInt(inst.batchsize);
-        int numberOfRuns = Integer.parseInt(inst.numRuns);
-
-        boolean isBatch = Boolean.parseBoolean(inst.batchFlag);
-        int timesOfWarmUp = Integer.parseInt(inst.warmUpIter);
-
         List<Context> context = new ArrayList<Context>();
         if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
                 Integer.valueOf(System.getenv("SCALA_TEST_ON_GPU")) == 1) {
@@ -123,20 +117,20 @@ public class EndToEndModelWoPreprocessing {
         Predictor predictorE2E = new Predictor(inst.modelPathPrefixE2E, inputDescriptorsE2E, context,0);
         Predictor predictorNonE2E = new Predictor(inst.modelPathPrefixNonE2E, inputDescriptorsNonE2E, context,0);
 
-        long[] currTimeE2E = new long[numberOfRuns + timesOfWarmUp];
-        long[] currTimeNonE2E = new long[numberOfRuns + timesOfWarmUp];
-        long[] timesE2E = new long[numberOfRuns + timesOfWarmUp];
-        long[] timesNonE2E = new long[numberOfRuns + timesOfWarmUp];
+        long[] currTimeE2E = new long[inst.numRuns + inst.warmUpIter];
+        long[] currTimeNonE2E = new long[inst.numRuns + inst.warmUpIter];
+        long[] timesE2E = new long[inst.numRuns + inst.warmUpIter];
+        long[] timesNonE2E = new long[inst.numRuns + inst.warmUpIter];
 
-        for (int n = 0; n < numberOfRuns + timesOfWarmUp; n++) {
+        for (int n = 0; n < inst.numRuns + inst.warmUpIter; n++) {
             try (ResourceScope scope = new ResourceScope()) {
                 NDArray nd;
-                if (isBatch) {
+                if (inst.isBatch) {
                     nd = NDArray.random_uniform(
                             NDArray.new random_uniformParam()
                                     .setLow(0f)
                                     .setHigh(255f)
-                                    .setShape(new Shape(new int[]{batchSize, 300, 300, 3})))[0];
+                                    .setShape(new Shape(new int[]{inst.batchSize, 300, 300, 3})))[0];
                 } else {
                     nd = NDArray.random_uniform(
                             NDArray.new random_uniformParam()
@@ -152,7 +146,7 @@ public class EndToEndModelWoPreprocessing {
                     img.asInContext(Context.gpu());
                 }
                 NDArray imgWithBatchNumE2E;
-                if (isBatch) {
+                if (inst.isBatch) {
                     imgWithBatchNumE2E = img;
                 } else {
                     imgWithBatchNumE2E = NDArray.expand_dims(img, 0, null)[0];
@@ -167,13 +161,13 @@ public class EndToEndModelWoPreprocessing {
                 // Non E2E
                 img.asInContext(Context.cpu());
                 currTimeNonE2E[n] = System.nanoTime();
-                NDArray preprocessedImage = preprocessImage(img, isBatch);
+                NDArray preprocessedImage = preprocessImage(img, inst.isBatch);
                 if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
                         Integer.valueOf(System.getenv("SCALA_TEST_ON_GPU")) == 1) {
                     preprocessedImage.asInContext(Context.gpu());
                 }
                 NDArray imgWithBatchNumNonE2E;
-                if (isBatch) {
+                if (inst.isBatch) {
                     imgWithBatchNumNonE2E = preprocessedImage;
                 } else {
                     imgWithBatchNumNonE2E = NDArray.expand_dims(preprocessedImage, 0, null)[0];
@@ -186,8 +180,8 @@ public class EndToEndModelWoPreprocessing {
             }
         }
         System.out.println("E2E");
-        printAvg(timesE2E, (isBatch) ? "batch_inference" : "single_inference", timesOfWarmUp);
+        printAvg(timesE2E, (inst.isBatch) ? "batch_inference" : "single_inference", inst.warmUpIter);
         System.out.println("Non E2E");
-        printAvg(timesNonE2E, (isBatch) ? "batch_inference" : "single_inference", timesOfWarmUp);
+        printAvg(timesNonE2E, (inst.isBatch) ? "batch_inference" : "single_inference", inst.warmUpIter);
     }
 }
