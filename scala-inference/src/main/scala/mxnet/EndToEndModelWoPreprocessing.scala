@@ -59,9 +59,7 @@ object EndToEndModelWoPreprocessing {
     }
   }
 
-  def printAvg(inferenceTimesRaw: Array[Long], metricsPrefix: String, timesOfWarmUp: Int): Unit = {
-    // remove warmup
-    val inferenceTimes = inferenceTimesRaw.slice(timesOfWarmUp, inferenceTimesRaw.length)
+  def printAvg(inferenceTimes: Array[Long], metricsPrefix: String, timesOfWarmUp: Int): Unit = {
     var sum: Long = 0
     for (time <- inferenceTimes) {
       sum += time
@@ -84,7 +82,7 @@ object EndToEndModelWoPreprocessing {
     val predictor = new
         Predictor(modelPathPrefix, inputDescriptor, context)
 
-    val times: Array[Long] = Array.fill(numOfRuns + timesOfWarmUp){0}
+    val times: Array[Long] = Array.fill(numOfRuns){0}
 
     for (n <- 0 until numOfRuns + timesOfWarmUp) {
       NDArrayCollector.auto().withScope {
@@ -93,8 +91,10 @@ object EndToEndModelWoPreprocessing {
         val img = NDArray.api.cast(nd, "uint8")
         var imgWithBatchNum: NDArray = null
         var preprocessedImage: NDArray = null
-
-        times(n) = System.nanoTime()
+        // time the latency after warmup
+        if (n >= timesOfWarmUp) {
+          times(n - timesOfWarmUp) = System.nanoTime()
+        }
         if (isE2E) {
           img.asInContext(context)
         } else {
@@ -104,7 +104,9 @@ object EndToEndModelWoPreprocessing {
         imgWithBatchNum = if (isE2E) img else preprocessedImage
         val output = predictor.predictWithNDArray(IndexedSeq(imgWithBatchNum))
         output(0).waitToRead()
-        times(n) = System.nanoTime() - times(n)
+        if (n >= timesOfWarmUp) {
+          times(n - timesOfWarmUp) = System.nanoTime() - times(n - timesOfWarmUp)
+        }
       }
     }
     println(if (isE2E) "E2E" else "Non E2E")
