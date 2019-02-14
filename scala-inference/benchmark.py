@@ -22,12 +22,12 @@ if __name__ == '__main__':
         '--use-batch {}'.format(CLASSPATH, args.num_runs, 'false'),
         stderr=subprocess.STDOUT,
         shell=True).decode(sys.stdout.encoding)
-    res = re.search('E2E\nsingle_inference_average (\d+.\d+)ms\nNon E2E\nsingle_inference_average (\d+.\d+)ms', output)
-    print('E2E single_inference_average {} Non E2E single_inference_average {}'.format(res.group(1), res.group(2)))
+    single_res = re.search('E2E\nsingle_inference_average (\d+.\d+)ms\nNon E2E\nsingle_inference_average (\d+.\d+)ms', output)
 
     # batch inference
     sum_e2e = 0.0
     sum_non_e2e = 0.0
+    # the defualt value is 20 so tha we have enough CPU and GPU memory
     num_iter_batch = 20 if args.num_runs > 20 else args.num_runs
     num_iter = args.num_runs // num_iter_batch if args.num_runs > num_iter_batch else 1
     print(num_iter)
@@ -42,4 +42,6 @@ if __name__ == '__main__':
         res = re.search('E2E\nbatch_inference_average (\d+.\d+)ms\nNon E2E\nbatch_inference_average (\d+.\d+)ms', output)
         sum_e2e += float(res.group(1))
         sum_non_e2e += float(res.group(2))
-    print('E2E batch_inference_average {} Non E2E batch_inference_average {}'.format(sum_e2e / num_iter, sum_non_e2e / num_iter))
+    print('E2E single_inference_average {} Non E2E single_inference_average {} '
+        'E2E batch_inference_average {} Non E2E batch_inference_average {}'
+        .format(single_res.group(1), single_res.group(2), sum_e2e / num_iter, sum_non_e2e / num_iter))
