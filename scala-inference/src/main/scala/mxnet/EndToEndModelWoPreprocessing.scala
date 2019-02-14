@@ -37,7 +37,7 @@ object EndToEndModelWoPreprocessing {
   @Option(name = "--batchsize", usage = "batch size")
   val batchSize: Int = 25
   @Option(name = "--end_to_end", usage = "benchmark with e2e / non e2e")
-  val isE2E: Boolean = true
+  val isE2E: Boolean = false
   @Option(name = "--warm-up", usage = "warm up iteration")
   val timesOfWarmUp: Int = 5
 
@@ -55,7 +55,6 @@ object EndToEndModelWoPreprocessing {
       resizedImg /= 255
       val totensorImg = NDArray.api.swapaxes(resizedImg, Some(1), Some(3))
       val preprocessedImg = (totensorImg - 0.456) / 0.224
-
       preprocessedImg
     }
   }
@@ -79,7 +78,7 @@ object EndToEndModelWoPreprocessing {
       inputDescriptor = IndexedSeq(DataDesc("data", inputShape, DType.UInt8, "NHWC"))
     } else {
       inputShape = Shape(1, 3, 224, 224)
-      inputDescriptor = IndexedSeq(DataDesc("data", inputShape, DType.UInt8, "NCHW"))
+      inputDescriptor = IndexedSeq(DataDesc("data", inputShape, DType.Float32, "NCHW"))
     }
 
     val predictor = new
@@ -115,7 +114,6 @@ object EndToEndModelWoPreprocessing {
   def main(args: Array[String]): Unit = {
 
     val parser = new CmdLineParser(EndToEndModelWoPreprocessing)
-
     try {
       parser.parseArgument(args.toList.asJava)
     } catch {
