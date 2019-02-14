@@ -36,7 +36,7 @@ object EndToEndModelWoPreprocessing {
   val numOfRuns: Int = 1
   @Option(name = "--batchsize", usage = "batch size")
   val batchSize: Int = 25
-  @Option(name = "--end_to_end", usage = "benchmark with e2e / non e2e")
+  @Option(name = "--end-to-end", usage = "benchmark with e2e / non e2e")
   val isE2E: Boolean = false
   @Option(name = "--warm-up", usage = "warm up iteration")
   val timesOfWarmUp: Int = 5
@@ -114,7 +114,6 @@ object EndToEndModelWoPreprocessing {
   }
 
   def main(args: Array[String]): Unit = {
-
     val parser = new CmdLineParser(EndToEndModelWoPreprocessing)
     try {
       parser.parseArgument(args.toList.asJava)
