@@ -36,57 +36,95 @@ import java.util.List;
 public class EndToEndModelWoPreprocessing {
     static NDArray$ NDArray = NDArray$.MODULE$;
 
-    @Option(name = "--model-e2e-path-prefix", usage = "input model directory and prefix of the model")
-    private String modelPathPrefixE2E = "../models/end_to_end_model/resnet18_end_to_end";
-    @Option(name = "--model-non_e2e-path-prefix", usage = "input model directory and prefix of the model")
-    private String modelPathPrefixNonE2E = "../models/not_end_to_end_model/resnet18_v1";
+    @Option(name = "--model-path-prefix", usage = "input model directory and prefix of the model")
+    private String modelPathPrefix = "resnet18_v1";
     @Option(name = "--num-runs", usage = "Number of runs")
-    private int numRuns = 1;
+    private int numOfRuns = 1;
     @Option(name = "--batchsize", usage = "batch size")
     private int batchSize = 25;
-    @Option(name = "--use-batch", usage = "flag to use batch inference")
-    private boolean isBatch = false;
+    @Option(name = "--end-to-end", usage = "benchmark with e2e / non e2e")
+    private boolean isE2E = false;
     @Option(name = "--warm-up", usage = "warm up iteration")
-    private int warmUpIter = 5;
+    private int timesOfWarmUp = 5;
 
     // process the image explicitly Resize -> ToTensor -> Normalize
-    private static NDArray preprocessImage(NDArray nd, boolean isBatch) {
+    private static NDArray preprocessImage(NDArray nd) {
         NDArray resizeImg;
-        if (isBatch) {
-            NDArray[] arr = new NDArray[nd.shape().get(0)];
-            for (int i = 0; i < nd.shape().get(0); i++) {
-                arr[i] = Image.imResize(nd.at(i), 224, 224);
-            }
-            resizeImg = NDArray.stack(arr, 0, arr.length, null)[0];
-            arr = null;
-        } else {
-            resizeImg = Image.imResize(nd, 224, 224);
+        NDArray[] arr = new NDArray[nd.shape().get(0)];
+        for (int i = 0; i < nd.shape().get(0); i++) {
+            arr[i] = Image.imResize(nd.at(i), 224, 224);
         }
+        resizeImg = NDArray.stack(arr, 0, arr.length, null)[0];
 
         resizeImg = NDArray.cast(resizeImg, "float32", null)[0];
         resizeImg = resizeImg.divInplace(255.0);
-        NDArray totensorImg;
-        if (isBatch) {
-            totensorImg = (NDArray.swapaxes(NDArray.new swapaxesParam(resizeImg).setDim1(1).setDim2(3)))[0];
-        } else {
-            totensorImg = (NDArray.swapaxes(NDArray.new swapaxesParam(resizeImg).setDim1(0).setDim2(2)))[0];
-        }
+        NDArray totensorImg = (NDArray.swapaxes(NDArray.new swapaxesParam(resizeImg).setDim1(1).setDim2(3)))[0];
+        // use 0.456 instead of (0.485, 0.456, 0.406) to simply the logic
         totensorImg = totensorImg.divInplace(0.456);
+        // use 0.224 instead of 0.229, 0.224, 0.225 to simply the logic
         NDArray preprocessedImg = totensorImg.divInplace(0.224);
 
         return preprocessedImg;
     }
 
-    private static void printAvg(long[] inferenceTimesRaw, String metricsPrefix, int timesOfWarmUp)  {
-        // remove warmup
-        long[] inferenceTimes = Arrays.copyOfRange(inferenceTimesRaw,
-                timesOfWarmUp, inferenceTimesRaw.length);
-        long sum = 0;
-        for (long time: inferenceTimes) {
+    private static void printAvg(double[] inferenceTimes, String metricsPrefix, int batchSize)  {
+        double sum = 0.0;
+        for (double time: inferenceTimes) {
             sum += time;
         }
-        double average = sum / (inferenceTimes.length * 1.0e6);
+        double average = sum / (batchSize * inferenceTimes.length);
         System.out.println(String.format("%s_average %1.2fms",metricsPrefix, average));
+    }
+
+    private static void runInference(String modelPathPrefix, List<Context> context, int batchSize, boolean isE2E, int numOfRuns, int timesOfWarmUp) {
+        Shape inputShape;
+        List<DataDesc> inputDescriptors = new ArrayList<>();
+        if (isE2E) {
+            inputShape = new Shape(new int[]{1, 300, 300, 3});
+            inputDescriptors.add(new DataDesc("data", inputShape, DType.UInt8(), "NHWC"));
+        } else {
+            inputShape = new Shape(new int[]{1, 3, 224, 224});
+            inputDescriptors.add(new DataDesc("data", inputShape, DType.Float32(), "NCHW"));
+        }
+        Predictor predictor = new Predictor(modelPathPrefix, inputDescriptors, context,0);
+
+        double[] times = new double[numOfRuns];
+
+        for (int n = 0; n < numOfRuns + timesOfWarmUp; n++) {
+            try(ResourceScope scope = new ResourceScope()) {
+                NDArray nd = NDArray.random_uniform(
+                        NDArray.new random_uniformParam()
+                                .setLow(0f)
+                                .setHigh(255f)
+                                .setShape(new Shape(new int[]{batchSize, 300, 300, 3})))[0];
+
+                NDArray img = NDArray.cast(nd, "uint8", null)[0];
+                NDArray imgWithBatchNum;
+                NDArray preprocessedImage = null;
+                Long curretTime = 0l;
+                // time the latency after warmup
+                if (n >= timesOfWarmUp) {
+                    curretTime = System.nanoTime();
+                }
+                if (isE2E) {
+                    img.asInContext(context.get(0));
+                } else {
+                    preprocessedImage = preprocessImage(img);
+                    preprocessedImage.asInContext(context.get(0));
+                }
+                imgWithBatchNum = (isE2E) ? img : preprocessedImage;
+                List<NDArray> input = new ArrayList<>();
+                input.add(imgWithBatchNum);
+                List<NDArray> output = predictor.predictWithNDArray(input);
+                output.get(0).waitToRead();
+                if (n >= timesOfWarmUp) {
+                    times[n - timesOfWarmUp] = (System.nanoTime() - curretTime) / (1e6 * 1.0);
+                }
+            }
+
+        }
+        System.out.println((isE2E) ? "E2E" : "Non E2E");
+        printAvg(times, (batchSize > 1) ? "batch_inference" : "single_inference", batchSize);
     }
 
     public static void main(String[] args) {
@@ -108,80 +146,6 @@ public class EndToEndModelWoPreprocessing {
             context.add(Context.cpu());
         }
 
-        Shape inputShapeE2E = new Shape(new int[]{1, 300, 300, 3});
-        Shape inputShapeNonE2E = new Shape(new int[]{1, 3, 224, 224});
-        List<DataDesc> inputDescriptorsE2E = new ArrayList<>();
-        List<DataDesc> inputDescriptorsNonE2E = new ArrayList<>();
-        inputDescriptorsE2E.add(new DataDesc("data", inputShapeE2E, DType.UInt8(), "NHWC"));
-        inputDescriptorsNonE2E.add(new DataDesc("data", inputShapeNonE2E, DType.Float32(), "NCHW"));
-        Predictor predictorE2E = new Predictor(inst.modelPathPrefixE2E, inputDescriptorsE2E, context,0);
-        Predictor predictorNonE2E = new Predictor(inst.modelPathPrefixNonE2E, inputDescriptorsNonE2E, context,0);
-
-        long[] currTimeE2E = new long[inst.numRuns + inst.warmUpIter];
-        long[] currTimeNonE2E = new long[inst.numRuns + inst.warmUpIter];
-        long[] timesE2E = new long[inst.numRuns + inst.warmUpIter];
-        long[] timesNonE2E = new long[inst.numRuns + inst.warmUpIter];
-
-        for (int n = 0; n < inst.numRuns + inst.warmUpIter; n++) {
-            try (ResourceScope scope = new ResourceScope()) {
-                NDArray nd;
-                if (inst.isBatch) {
-                    nd = NDArray.random_uniform(
-                            NDArray.new random_uniformParam()
-                                    .setLow(0f)
-                                    .setHigh(255f)
-                                    .setShape(new Shape(new int[]{inst.batchSize, 300, 300, 3})))[0];
-                } else {
-                    nd = NDArray.random_uniform(
-                            NDArray.new random_uniformParam()
-                                    .setLow(0f)
-                                    .setHigh(255f)
-                                    .setShape(new Shape(new int[]{300, 300, 3})))[0];
-                }
-                NDArray img = NDArray.cast(nd, "uint8", null)[0];
-                //E2E
-                currTimeE2E[n] = System.nanoTime();
-                if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
-                        Integer.valueOf(System.getenv("SCALA_TEST_ON_GPU")) == 1) {
-                    img.asInContext(Context.gpu());
-                }
-                NDArray imgWithBatchNumE2E;
-                if (inst.isBatch) {
-                    imgWithBatchNumE2E = img;
-                } else {
-                    imgWithBatchNumE2E = NDArray.expand_dims(img, 0, null)[0];
-                }
-                List<NDArray> inputE2E = new ArrayList<>();
-                inputE2E.add(imgWithBatchNumE2E);
-
-                List<NDArray> resE2E = predictorE2E.predictWithNDArray(inputE2E);
-                resE2E.get(0).waitToRead();
-                timesE2E[n] = System.nanoTime() - currTimeE2E[n];
-
-                // Non E2E
-                img.asInContext(Context.cpu());
-                currTimeNonE2E[n] = System.nanoTime();
-                NDArray preprocessedImage = preprocessImage(img, inst.isBatch);
-                if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
-                        Integer.valueOf(System.getenv("SCALA_TEST_ON_GPU")) == 1) {
-                    preprocessedImage.asInContext(Context.gpu());
-                }
-                NDArray imgWithBatchNumNonE2E;
-                if (inst.isBatch) {
-                    imgWithBatchNumNonE2E = preprocessedImage;
-                } else {
-                    imgWithBatchNumNonE2E = NDArray.expand_dims(preprocessedImage, 0, null)[0];
-                }
-                List<NDArray> inputNonE2E = new ArrayList<>();
-                inputNonE2E.add(imgWithBatchNumNonE2E);
-                List<NDArray> resNonE2E = predictorNonE2E.predictWithNDArray(inputNonE2E);
-                resNonE2E.get(0).waitToRead();
-                timesNonE2E[n] = System.nanoTime() - currTimeNonE2E[n];
-            }
-        }
-        System.out.println("E2E");
-        printAvg(timesE2E, (inst.isBatch) ? "batch_inference" : "single_inference", inst.warmUpIter);
-        System.out.println("Non E2E");
-        printAvg(timesNonE2E, (inst.isBatch) ? "batch_inference" : "single_inference", inst.warmUpIter);
+        runInference(inst.modelPathPrefix, context, inst.batchSize, inst.isE2E, inst.numOfRuns, inst.timesOfWarmUp);
     }
 }
