@@ -28,6 +28,7 @@ def run_inference(iterations, model_path, end_to_end, use_gpus):
     # the defualt value is 20 so tha we have enough CPU and GPU memory
     num_iter_batch = 20 if args.iterations > 20 else args.iterations
     num_iter = iterations // num_iter_batch if args.iterations > num_iter_batch else 1
+    res = None
     for _ in range(num_iter):
         try:
             output = subprocess.check_output('java -Xmx8G  -cp {} '
