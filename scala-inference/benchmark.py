@@ -53,10 +53,11 @@ if __name__ == '__main__':
             ' {}'.format(CLASSPATH, args.model_path, num_iter_batch, 25, 5, '--end_to_end' if args.end_to_end else ''),
             stderr=subprocess.STDOUT,
             shell=True).decode(sys.stdout.encoding)
+            print(output)
             res = re.search('(E2E| Non E2E)\n(single|batch)_inference_average (\d+.\d+)ms', output)
             sum_result += float(res.group(3))
         except subprocess.CalledProcessError as e:
             print(e.output)
 
-    print('{} {}_inference_average {}'
+    print('{} {}_inference_average {}ms'
         .format(res.group(1), res.group(2), sum_result / num_iter))
