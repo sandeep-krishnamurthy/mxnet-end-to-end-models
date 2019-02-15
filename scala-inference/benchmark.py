@@ -10,6 +10,7 @@ CURRE_DIR = os.getcwd()
 CLASSPATH= '$CLASSPATH:{}/target/*:$CLASSPATH:{}/target/dependency/*:$CLASSPATH:{}/target/classes/lib/*'.format(CURRE_DIR, CURRE_DIR, CURRE_DIR)
 SCALA_VERSION_PROFILE='2.11'
 MXNET_VERSION='[1.5.0-SNAPSHOT,)'
+BATCH_SIZE = 25
 
 def download_model(model_name, model_path):
     model_json_path = "{}/{}-symbol.json".format(model_path, model_name)
@@ -23,12 +24,11 @@ def download_model(model_name, model_path):
     except Exception as e:
         print("ERROR: Failed to download the models. {}".format(e))
 
-def run_inference(iterations, model_path, end_to_end, use_gpus):
+def run_inference(iterations, batch_size, model_path, end_to_end, use_gpus):
     sum_result = 0.0
     # the defualt value is 20 so tha we have enough CPU and GPU memory
     num_iter_batch = 20 if args.iterations > 20 else args.iterations
     num_iter = iterations // num_iter_batch if args.iterations > num_iter_batch else 1
-    res = None
     for _ in range(num_iter):
         try:
             output = subprocess.check_output('java -Xmx8G  -cp {} '
@@ -37,7 +37,7 @@ def run_inference(iterations, model_path, end_to_end, use_gpus):
             '--num-runs {} '
             '--batchsize {} '
             '--warm-up {} '
-            '{} {}'.format(CLASSPATH, model_path, num_iter_batch, 25, 5, 
+            '{} {}'.format(CLASSPATH, model_path, num_iter_batch, batch_size, 5, 
                 '--end-to-end' if end_to_end else '',
                 '--use-gpu' if int(use_gpus) > 0 else ''),
             stderr=subprocess.STDOUT,
@@ -68,6 +68,6 @@ if __name__ == '__main__':
     # subprocess.run(['./mvnw', 'clean install dependency:copy-dependencies package -Dmxnet.hw_type={} -Dmxnet.scalaprofile={} -Dmxnet.version={}'.format(hw_type, SCALA_VERSION_PROFILE, MXNET_VERSION)])
 
     # single inference
-    run_inference(1, args.model_path, args.end_to_end, args.use_gpus)
+    run_inference(args.iterations, 1, args.model_path, args.end_to_end, args.use_gpus)
     # batch inference
-    run_inference(args.iterations, args.model_path, args.end_to_end, args.use_gpus)
+    run_inference(args.iterations, BATCH_SIZE, args.model_path, args.end_to_end, args.use_gpus)
