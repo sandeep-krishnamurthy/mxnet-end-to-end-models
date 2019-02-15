@@ -57,7 +57,7 @@ if __name__ == '__main__':
             res = re.search('(E2E|Non E2E)\n(single|batch)_inference_average (\d+.\d+)ms', output)
             sum_result += float(res.group(3))
         except subprocess.CalledProcessError as e:
-            print(e.output)
+            print(e.output.decode(sys.stdout.encoding))
             exit()
 
     print('{} {}_inference_average {}ms'
