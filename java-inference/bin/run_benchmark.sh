@@ -15,6 +15,27 @@
 # specific language governing permissions and limitations
 # under the License.
 #!/bin/bash
+set -ex
+
+hw_type=cpu
+if [[ $1 = gpu ]]
+then
+    hw_type=gpu
+fi
+
+SCALA_VERSION_PROFILE=2.11
+MXNET_VERSION="[1.5.0-SNAPSHOT,)"
+
+# use maven wrapper to avoid dead lock when using the apt install maven but sudo apt update still running on background
+# ./mvnw clean install dependency:copy-dependencies package -Dmxnet.hw_type=$hw_type -Dmxnet.scalaprofile=$SCALA_VERSION_PROFILE -Dmxnet.version=$MXNET_VERSION
+
 CURR_DIR=$(cd $(dirname $0)/../; pwd)
-CLASSPATH=$CLASSPATH:$CURR_DIR/target/*:$CLASSPATH:$CURR_DIR/target/dependency/*
-java -Xmx8G  -cp $CLASSPATH mxnet.EndToEndModelWoPreprocessing --model-path-prefix ../models/end_to_end_model/resnet18_end_to_end --num-runs 5 --batchsize 25 --warm-up 2 --end-to-end
+
+CLASSPATH=$CLASSPATH:$CURR_DIR/target/*:$CLASSPATH:$CURR_DIR/target/dependency/*:$CLASSPATH:$CURR_DIR/target/classes/lib/*
+
+java -Xmx8G  -cp $CLASSPATH mxnet.EndToEndModelWoPreprocessing \
+--model-path-prefix ../models/end_to_end_model/resnet18_end_to_end \
+--num-runs 5 \
+--batchsize 25 \
+--warm-up 2 \
+--end-to-end
