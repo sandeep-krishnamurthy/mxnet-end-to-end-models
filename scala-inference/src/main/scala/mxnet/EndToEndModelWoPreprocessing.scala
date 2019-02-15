@@ -99,13 +99,12 @@ object EndToEndModelWoPreprocessing {
           currentTime = System.nanoTime()
         }
         if (isE2E) {
-          img.asInContext(context)
+          preprocessedImage = img
         } else {
           preprocessedImage = preprocessImage(img)
-          preprocessedImage.asInContext(context)
         }
-        imgWithBatchNum = if (isE2E) img else preprocessedImage
-        val output = predictor.predictWithNDArray(IndexedSeq(imgWithBatchNum))
+        preprocessedImage.asInContext(context)
+        val output = predictor.predictWithNDArray(IndexedSeq(preprocessedImage))
         output(0).waitToRead()
         if (n >= timesOfWarmUp) {
           times(n - timesOfWarmUp) = (System.nanoTime() - currentTime) / (1e6 * 1.0)

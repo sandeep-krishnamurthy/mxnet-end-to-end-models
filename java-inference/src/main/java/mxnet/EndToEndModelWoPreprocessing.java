@@ -107,14 +107,13 @@ public class EndToEndModelWoPreprocessing {
                     curretTime = System.nanoTime();
                 }
                 if (isE2E) {
-                    img.asInContext(context.get(0));
+                    preprocessedImage = img;
                 } else {
                     preprocessedImage = preprocessImage(img);
-                    preprocessedImage.asInContext(context.get(0));
                 }
-                imgWithBatchNum = (isE2E) ? img : preprocessedImage;
+                preprocessedImage.asInContext(context.get(0));
                 List<NDArray> input = new ArrayList<>();
-                input.add(imgWithBatchNum);
+                input.add(preprocessedImage);
                 List<NDArray> output = predictor.predictWithNDArray(input);
                 output.get(0).waitToRead();
                 if (n >= timesOfWarmUp) {

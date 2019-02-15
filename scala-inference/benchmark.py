@@ -58,6 +58,7 @@ if __name__ == '__main__':
             sum_result += float(res.group(3))
         except subprocess.CalledProcessError as e:
             print(e.output)
+            exit()
 
     print('{} {}_inference_average {}ms'
         .format(res.group(1), res.group(2), sum_result / num_iter))
