@@ -38,7 +38,7 @@ $end_to_end \
 $use_gpu)
 
 sum=0.0
-# the defualt value is 20 so tha we have enough CPU and GPU memory
+# the defualt value is 25 so tha we have enough CPU and GPU memory
 num_iter=$(($3/25))
 num_runs=25
 if (( $3 < 25 )); then num_runs=$3; fi
@@ -59,4 +59,4 @@ do
 done
 
 metrix=$(echo $output_batch | grep -oE '(single|batch)_inference_average')
-echo '$output_single $metrix $(awk "BEGIN {print $sum / $num_iter}")ms'
+echo "$output_single $metrix $(awk "BEGIN {print $sum / $num_iter}")ms"
