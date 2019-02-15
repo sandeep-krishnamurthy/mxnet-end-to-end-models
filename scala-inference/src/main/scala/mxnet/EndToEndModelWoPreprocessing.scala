@@ -113,7 +113,7 @@ object EndToEndModelWoPreprocessing {
         }
       }
     }
-    println(if (isE2E) "E2E" else "Non E2E")
+    print(if (isE2E) "E2E " else "Non E2E ")
     printAvg(times, if (batchSize > 1) "batch_inference" else "single_inference", batchSize)
   }
 

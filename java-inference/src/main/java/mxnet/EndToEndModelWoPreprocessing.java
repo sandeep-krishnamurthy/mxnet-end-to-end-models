@@ -124,7 +124,7 @@ public class EndToEndModelWoPreprocessing {
             }
 
         }
-        System.out.println((isE2E) ? "E2E" : "Non E2E");
+        System.out.print((isE2E) ? "E2E " : "Non E2E ");
         printAvg(times, (batchSize > 1) ? "batch_inference" : "single_inference", batchSize);
     }
 
