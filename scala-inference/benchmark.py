@@ -41,8 +41,9 @@ def run_inference(iterations, batch_size, model_path, end_to_end, use_gpus):
                 '--end-to-end' if end_to_end else '',
                 '--use-gpu' if int(use_gpus) > 0 else ''),
             stderr=subprocess.STDOUT,
-            shell=True).decode(sys.stdout.encoding)
-            res = re.search('(E2E|Non E2E)\n(single|batch)_inference_average (\d+.\d+)ms', output)
+            shell=True)
+            print(output.cmd)
+            res = re.search('(E2E|Non E2E)\n(single|batch)_inference_average (\d+.\d+)ms', output.decode(sys.stdout.encoding))
             sum_result += float(res.group(3))
         except subprocess.CalledProcessError as e:
             print(e.output.decode(sys.stdout.encoding))
