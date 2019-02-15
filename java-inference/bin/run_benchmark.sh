@@ -55,7 +55,6 @@ do
     value=$(echo $output_batch | grep -oP '(E2E|Non E2E) (single|batch)_inference_average \K(\d+.\d+)(?=ms)')
     # use awk to support float calculation
     sum=$(awk "BEGIN {print $sum+$value}")
-    echo $value
 done
 
 metrix=$(echo $output_batch | grep -oE '(single|batch)_inference_average')
