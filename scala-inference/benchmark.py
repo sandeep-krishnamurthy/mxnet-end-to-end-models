@@ -48,7 +48,7 @@ def run_inference(iterations, batch_size, model_path, end_to_end, use_gpus):
             print(e.output.decode(sys.stdout.encoding))
             exit()
 
-    print('{} {}_inference_average {}ms'
+    print('{} {}_inference_average {:.2f}ms'
         .format(res.group(1), res.group(2), sum_result / num_iter))
 
 
