@@ -28,7 +28,7 @@ def run_inference(iterations, model_path, end_to_end, use_gpus):
     # the defualt value is 20 so tha we have enough CPU and GPU memory
     num_iter_batch = 20 if args.iterations > 20 else args.iterations
     num_iter = iterations // num_iter_batch if args.iterations > num_iter_batch else 1
-    for i in range(num_iter):
+    for _ in range(num_iter):
         try:
             output = subprocess.check_output('java -Xmx8G  -cp {} '
             'mxnet.EndToEndModelWoPreprocessing '
@@ -67,7 +67,6 @@ if __name__ == '__main__':
     # subprocess.run(['./mvnw', 'clean install dependency:copy-dependencies package -Dmxnet.hw_type={} -Dmxnet.scalaprofile={} -Dmxnet.version={}'.format(hw_type, SCALA_VERSION_PROFILE, MXNET_VERSION)])
 
     # single inference
-    print(args.use_gpus)
     run_inference(1, args.model_path, args.end_to_end, args.use_gpus)
     # batch inference
     run_inference(args.iterations, args.model_path, args.end_to_end, args.use_gpus)
