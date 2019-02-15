@@ -43,15 +43,18 @@ if __name__ == '__main__':
     num_iter_batch = 20 if args.iterations > 20 else args.iterations
     num_iter = args.iterations // num_iter_batch if args.iterations > num_iter_batch else 1
     for i in range(num_iter):
-        output = subprocess.check_output('java -Xmx8G  -cp {} '
-        'mxnet.EndToEndModelWoPreprocessing '
-        '--model-path-prefix {} '
-        '--num-runs {}'
-        '--batchsize {}'
-        '--warm-up {}'
-        ' {}'.format(CLASSPATH, args.model_path, num_iter_batch, 25, 5, '--end_to_end' if args.end_to_end else ''),
-        stderr=subprocess.STDOUT,
-        shell=True).decode(sys.stdout.encoding)
+        try:
+            output = subprocess.check_output('java -Xmx8G  -cp {} '
+            'mxnet.EndToEndModelWoPreprocessing '
+            '--model-path-prefix {} '
+            '--num-runs {}'
+            '--batchsize {}'
+            '--warm-up {}'
+            ' {}'.format(CLASSPATH, args.model_path, num_iter_batch, 25, 5, '--end_to_end' if args.end_to_end else ''),
+            stderr=subprocess.STDOUT,
+            shell=True).decode(sys.stdout.encoding)
+        except subprocess.CalledProcessError as e:
+            print(e.output)
         res = re.search('(E2E| Non E2E)\n(single|batch)_inference_average (\d+.\d+)ms', output)
         sum_result += float(res.group(3))
 
