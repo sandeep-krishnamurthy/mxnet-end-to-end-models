@@ -50,7 +50,7 @@ if __name__ == '__main__':
             '--num-runs {} '
             '--batchsize {} '
             '--warm-up {} '
-            ' {}'.format(CLASSPATH, args.model_path, num_iter_batch, 25, 5, '--end_to_end' if args.end_to_end else ''),
+            ' {}'.format(CLASSPATH, args.model_path, num_iter_batch, 25, 5, '--end-to-end' if args.end_to_end else ''),
             stderr=subprocess.STDOUT,
             shell=True).decode(sys.stdout.encoding)
             print(output)
