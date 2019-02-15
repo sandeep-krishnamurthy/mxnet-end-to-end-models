@@ -38,7 +38,6 @@ $end_to_end \
 $use_gpu)
 
 sum=0.0
-count=0
 # the defualt value is 20 so tha we have enough CPU and GPU memory
 num_iter=$(($3/25))
 num_runs=25
@@ -56,9 +55,8 @@ do
     value=$(echo $output_batch | grep -oP '(E2E|Non E2E) (single|batch)_inference_average \K(\d+.\d+)(?=ms)')
     # use awk to support float calculation
     sum=$(awk "BEGIN {print $sum+$value}")
-    count=$(awk "BEGIN {print $count+1})
     echo $value
 done
 
 metrix=$(echo $output_batch | grep -oE '(single|batch)_inference_average')
-echo '$output_single $metrix $(awk "BEGIN {print $sum/$count}")ms'
+echo '$output_single $metrix $(awk "BEGIN {print $sum / $num_iter}")ms'
