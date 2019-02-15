@@ -43,14 +43,14 @@ def run_inference(iterations, batch_size, model_path, end_to_end, use_gpus):
             stderr=subprocess.STDOUT,
             shell=True).decode(sys.stdout.encoding)
             print('java -Xmx8G  -cp {} '
-            'mxnet.EndToEndModelWoPreprocessing '
-            '--model-path-prefix {} '
-            '--num-runs {} '
-            '--batchsize {} '
-            '--warm-up {} '
-            '{} {}'.format(CLASSPATH, model_path, num_iter_batch, batch_size, 5, 
+                'mxnet.EndToEndModelWoPreprocessing '
+                '--model-path-prefix {} '
+                '--num-runs {} '
+                '--batchsize {} '
+                '--warm-up {} '
+                '{} {}'.format(CLASSPATH, model_path, num_iter_batch, batch_size, 5, 
                 '--end-to-end' if end_to_end else '',
-                '--use-gpu' if int(use_gpus) > 0 else '')
+                '--use-gpu' if int(use_gpus) > 0 else ''))
             res = re.search('(E2E|Non E2E)\n(single|batch)_inference_average (\d+.\d+)ms', output)
             sum_result += float(res.group(3))
         except subprocess.CalledProcessError as e:
