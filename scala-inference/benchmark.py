@@ -7,7 +7,7 @@ import mxnet as mx
 
 
 CURRE_DIR = os.getcwd()
-CLASSPATH= '$CLASSPATH:{}/target/*:$CLASSPATH:{}/target/classes/lib/*'.format(CURRE_DIR, CURRE_DIR)
+CLASSPATH= '$CLASSPATH:{}/target/*:$CLASSPATH:{}/target/dependency/*:$CLASSPATH:{}/target/classes/lib/*'.format(CURRE_DIR, CURRE_DIR, CURRE_DIR)
 SCALA_VERSION_PROFILE='2.11'
 MXNET_VERSION='[1.5.0-SNAPSHOT,)'
 
