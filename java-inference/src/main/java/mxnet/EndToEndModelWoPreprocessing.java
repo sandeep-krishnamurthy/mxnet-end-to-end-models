@@ -59,12 +59,12 @@ public class EndToEndModelWoPreprocessing {
         resizeImg = NDArray.stack(arr, 0, arr.length, null)[0];
 
         resizeImg = NDArray.cast(resizeImg, "float32", null)[0];
-        resizeImg = resizeImg.divInplace(255.0);
+        resizeImg = resizeImg.div(255.0);
         NDArray totensorImg = (NDArray.swapaxes(NDArray.new swapaxesParam(resizeImg).setDim1(1).setDim2(3)))[0];
         // use 0.456 instead of (0.485, 0.456, 0.406) to simply the logic
-        totensorImg = totensorImg.subtractInplace(0.456);
+        totensorImg = totensorImg.subtract(0.456);
         // use 0.224 instead of 0.229, 0.224, 0.225 to simply the logic
-        NDArray preprocessedImg = totensorImg.divInplace(0.224);
+        NDArray preprocessedImg = totensorImg.div(0.224);
 
         return preprocessedImg;
     }
