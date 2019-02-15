@@ -42,8 +42,8 @@ count=0
 # the defualt value is 20 so tha we have enough CPU and GPU memory
 num_iter=$(($3/25))
 num_runs=25
-if [ $3 < 25]; then num_runs=$3; fi
-if [ $num_iter = 0 ]; then num_iter=1; fi
+if (( $3 < 25 )); then num_runs=$3; fi
+if (( $num_iter == 0 )); then num_iter=1; fi
 for n in `seq 1 $num_iter`
 do
     output_batch=$(java -Xmx8G  -cp $CLASSPATH mxnet.EndToEndModelWoPreprocessing \
@@ -61,4 +61,4 @@ do
 done
 
 metrix=$(echo $output_batch | grep -oE '(single|batch)_inference_average')
-echo "$output_single $metrix $(awk "BEGIN {print $sum/$count}")ms"
+echo '$output_single $metrix $(awk "BEGIN {print $sum/$count}")ms'
