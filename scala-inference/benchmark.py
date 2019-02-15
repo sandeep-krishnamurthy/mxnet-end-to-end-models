@@ -29,43 +29,32 @@ if __name__ == '__main__':
     parser.add_argument('--model-path', type=str, help='URL to download the model')
     parser.add_argument('--model-name', type=str, help='Name of the model. This will be used to download the right symbol and params files from model_path')
     parser.add_argument('--iterations', type=int, help='Number of times to run the benchmark')
-    parser.add_argument('--batch-size', type=int, help='Number of times to run the benchmark')
+    parser.add_argument('--use_gpus', type=int, help='Number of gpu the benchmark will use')
+    parser.add_argument('--end_to_end', type=bool, help='flag to benchmark end to end model or non end to end')
 
     args = parser.parse_args()
     # prepare the model
-    download_model(args.model_name, args.model_path)
+    # download_model(args.model_name, args.model_path)
     # setup the maven
+    # hw_type = 'gpu' if int(args.use_gpus) > 0 else 'cpu'
+    # subprocess.run(['./mvnw', 'clean install dependency:copy-dependencies package -Dmxnet.hw_type={} -Dmxnet.scalaprofile={} -Dmxnet.version={}'.format(hw_type, SCALA_VERSION_PROFILE, MXNET_VERSION)])
     
-    # single inference
-    output = subprocess.check_output('java -Xmx8G  -cp {} '
-        'mxnet.EndToEndModelWoPreprocessing '
-        '--num-runs {} '
-        '--use-batch {}'
-        '--batchsize {}'.format(CLASSPATH, args.iterations, 'false', args.batch_size),
-        stderr=subprocess.STDOUT,
-        shell=True).decode(sys.stdout.encoding)
-    single_res = re.search('E2E\nsingle_inference_average (\d+.\d+)ms\nNon E2E\nsingle_inference_average (\d+.\d+)ms', output)
-
-    # batch inference
-    sum_e2e = 0.0
-    sum_non_e2e = 0.0
+    sum_result = 0.0
     # the defualt value is 20 so tha we have enough CPU and GPU memory
     num_iter_batch = 20 if args.num_runs > 20 else args.num_runs
     num_iter = args.num_runs // num_iter_batch if args.num_runs > num_iter_batch else 1
-    print(num_iter)
-    print(num_iter_batch)
     for i in range(num_iter):
         output = subprocess.check_output('java -Xmx8G  -cp {} '
         'mxnet.EndToEndModelWoPreprocessing '
-        '--num-runs {} '
-        '--use-batch {}'
-        '--batchsize {}'.format(CLASSPATH, args.iterations, 'false', args.batch_size),
+        '--model-path-prefix {} '
+        '--num-runs {}'
+        '--batchsize {}'
+        '--warm-up {}'
+        ' {}'.format(CLASSPATH, args.model_path, args.num_runs, 1, 5, '--end_to_end' if args.end_to_end else ''),
         stderr=subprocess.STDOUT,
         shell=True).decode(sys.stdout.encoding)
-        res = re.search('E2E\nbatch_inference_average (\d+.\d+)ms\nNon E2E\nbatch_inference_average (\d+.\d+)ms', output)
-        sum_e2e += float(res.group(1))
-        sum_non_e2e += float(res.group(2))
+        res = re.search('(E2E| Non E2E)\n(single|batch)_inference_average (\d+.\d+)ms', output)
+        sum_result += float(res.group(3))
 
-    print('E2E single_inference_average {} Non E2E single_inference_average {} '
-        'E2E batch_inference_average {} Non E2E batch_inference_average {}'
-        .format(single_res.group(1), single_res.group(2), sum_e2e / num_iter, sum_non_e2e / num_iter))
+    print('{} {}_inference_average {}'
+        .format(res.group(1), res.group(2), sum_result / num_iter))
