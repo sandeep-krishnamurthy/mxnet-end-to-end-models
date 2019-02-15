@@ -47,9 +47,9 @@ if __name__ == '__main__':
             output = subprocess.check_output('java -Xmx8G  -cp {} '
             'mxnet.EndToEndModelWoPreprocessing '
             '--model-path-prefix {} '
-            '--num-runs {}'
-            '--batchsize {}'
-            '--warm-up {}'
+            '--num-runs {} '
+            '--batchsize {} '
+            '--warm-up {} '
             ' {}'.format(CLASSPATH, args.model_path, num_iter_batch, 25, 5, '--end_to_end' if args.end_to_end else ''),
             stderr=subprocess.STDOUT,
             shell=True).decode(sys.stdout.encoding)
