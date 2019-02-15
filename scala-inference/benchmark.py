@@ -29,8 +29,8 @@ if __name__ == '__main__':
     parser.add_argument('--model-path', type=str, help='URL to download the model')
     parser.add_argument('--model-name', type=str, help='Name of the model. This will be used to download the right symbol and params files from model_path')
     parser.add_argument('--iterations', type=int, help='Number of times to run the benchmark')
-    parser.add_argument('--use_gpus', type=int, help='Number of gpu the benchmark will use')
-    parser.add_argument('--end_to_end', type=bool, help='flag to benchmark end to end model or non end to end')
+    parser.add_argument('--use-gpus', type=int, help='Number of gpu the benchmark will use')
+    parser.add_argument('--end-to_end', type=bool, help='flag to benchmark end to end model or non end to end')
 
     args = parser.parse_args()
     # prepare the model
