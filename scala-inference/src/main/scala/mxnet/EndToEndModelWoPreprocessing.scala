@@ -40,6 +40,8 @@ object EndToEndModelWoPreprocessing {
   val isE2E: Boolean = false
   @Option(name = "--warm-up", usage = "warm up iteration")
   val timesOfWarmUp: Int = 5
+  @Option(name = "--use-gpu", usage = "use gpu or cpu")
+  val useGPU: Boolean = false
 
   // process the image explicitly Resize -> ToTensor -> Normalize
   def preprocessImage(nd: NDArray): NDArray = {
@@ -126,11 +128,7 @@ object EndToEndModelWoPreprocessing {
         System.exit(1)
     }
 
-    var context = Context.cpu()
-    if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
-      System.getenv("SCALA_TEST_ON_GPU").toInt == 1) {
-      context = Context.gpu()
-    }
+    val context = if (useGPU) Context.gpu() else Context.cpu()
 
     runInference(modelPathPrefix, context, batchSize, isE2E, numOfRuns, timesOfWarmUp)
   }

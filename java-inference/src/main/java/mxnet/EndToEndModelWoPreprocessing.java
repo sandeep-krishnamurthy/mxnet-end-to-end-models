@@ -46,6 +46,8 @@ public class EndToEndModelWoPreprocessing {
     private boolean isE2E = false;
     @Option(name = "--warm-up", usage = "warm up iteration")
     private int timesOfWarmUp = 5;
+    @Option(name = "--use-gpu", usage = "use gpu or cpu")
+    private boolean useGPU = false;
 
     // process the image explicitly Resize -> ToTensor -> Normalize
     private static NDArray preprocessImage(NDArray nd) {
@@ -57,12 +59,12 @@ public class EndToEndModelWoPreprocessing {
         resizeImg = NDArray.stack(arr, 0, arr.length, null)[0];
 
         resizeImg = NDArray.cast(resizeImg, "float32", null)[0];
-        resizeImg = resizeImg.divInplace(255.0);
+        resizeImg = resizeImg.div(255.0);
         NDArray totensorImg = (NDArray.swapaxes(NDArray.new swapaxesParam(resizeImg).setDim1(1).setDim2(3)))[0];
         // use 0.456 instead of (0.485, 0.456, 0.406) to simply the logic
-        totensorImg = totensorImg.divInplace(0.456);
+        totensorImg = totensorImg.subtract(0.456);
         // use 0.224 instead of 0.229, 0.224, 0.225 to simply the logic
-        NDArray preprocessedImg = totensorImg.divInplace(0.224);
+        NDArray preprocessedImg = totensorImg.div(0.224);
 
         return preprocessedImg;
     }
@@ -138,12 +140,7 @@ public class EndToEndModelWoPreprocessing {
         }
 
         List<Context> context = new ArrayList<Context>();
-        if (System.getenv().containsKey("SCALA_TEST_ON_GPU") &&
-                Integer.valueOf(System.getenv("SCALA_TEST_ON_GPU")) == 1) {
-            context.add(Context.gpu());
-        } else {
-            context.add(Context.cpu());
-        }
+        context.add((inst.useGPU) ? Context.gpu() : Context.cpu());
 
         runInference(inst.modelPathPrefix, context, inst.batchSize, inst.isE2E, inst.numOfRuns, inst.timesOfWarmUp);
     }
