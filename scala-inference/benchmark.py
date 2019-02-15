@@ -36,7 +36,7 @@ def run_inference(iterations, model_path, end_to_end, use_gpus):
             '--num-runs {} '
             '--batchsize {} '
             '--warm-up {} '
-            ' {} {}'.format(CLASSPATH, model_path, num_iter_batch, 25, 5, 
+            '{} {}'.format(CLASSPATH, model_path, num_iter_batch, 25, 5, 
                 '--end-to-end' if end_to_end else '',
                 '--use-gpu' if int(use_gpus) > 0 else ''),
             stderr=subprocess.STDOUT,
@@ -67,6 +67,7 @@ if __name__ == '__main__':
     # subprocess.run(['./mvnw', 'clean install dependency:copy-dependencies package -Dmxnet.hw_type={} -Dmxnet.scalaprofile={} -Dmxnet.version={}'.format(hw_type, SCALA_VERSION_PROFILE, MXNET_VERSION)])
 
     # single inference
+    print(args.use_gpus)
     run_inference(1, args.model_path, args.end_to_end, args.use_gpus)
     # batch inference
     run_inference(args.iterations, args.model_path, args.end_to_end, args.use_gpus)
