@@ -52,10 +52,11 @@ do
     $end_to_end \
     $use_gpu)
     value=$(echo $output_batch | grep -oP '(E2E|Non E2E) (single|batch)_inference_average \K(\d+.\d+)(?=ms)')
-    sum=$((echo $sum+$value))
+    # use awk to support float calculation
+    sum=$((awk "BEGIN {print $sum+$value}"))
     ((count++))
     echo $value
 done
 
 metrix=$(echo $output_batch | grep -oE '(single|batch)_inference_average')
-echo "$output_single $metrix $((echo "$sum/$count"))ms"
+echo "$output_single $metrix $((awk "BEGIN {print $sum/$count}"))ms"
