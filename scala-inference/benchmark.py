@@ -38,7 +38,6 @@ if __name__ == '__main__':
     # setup the maven
     # hw_type = 'gpu' if int(args.use_gpus) > 0 else 'cpu'
     # subprocess.run(['./mvnw', 'clean install dependency:copy-dependencies package -Dmxnet.hw_type={} -Dmxnet.scalaprofile={} -Dmxnet.version={}'.format(hw_type, SCALA_VERSION_PROFILE, MXNET_VERSION)])
-    
     sum_result = 0.0
     # the defualt value is 20 so tha we have enough CPU and GPU memory
     num_iter_batch = 20 if args.num_runs > 20 else args.num_runs
@@ -50,7 +49,7 @@ if __name__ == '__main__':
         '--num-runs {}'
         '--batchsize {}'
         '--warm-up {}'
-        ' {}'.format(CLASSPATH, args.model_path, num_iter_batch, 1, 5, '--end_to_end' if args.end_to_end else ''),
+        ' {}'.format(CLASSPATH, args.model_path, num_iter_batch, 25, 5, '--end_to_end' if args.end_to_end else ''),
         stderr=subprocess.STDOUT,
         shell=True).decode(sys.stdout.encoding)
         res = re.search('(E2E| Non E2E)\n(single|batch)_inference_average (\d+.\d+)ms', output)
