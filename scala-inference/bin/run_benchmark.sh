@@ -40,7 +40,7 @@ $use_gpu)
 sum=0.0
 count=0
 # the defualt value is 20 so tha we have enough CPU and GPU memory
-num_iter=$(echo $3/25 | bc)
+num_iter=$((echo $3/25))
 if [ $num_iter = 0 ]; then num_iter=1; fi
 for n in `seq 1 $num_iter`
 do
@@ -51,11 +51,11 @@ do
     --warm-up 1 \
     $end_to_end \
     $use_gpu)
-    value=$(echo $output_batch | ggrep -oP '(E2E|Non E2E) (single|batch)_inference_average \K(\d+.\d+)(?=ms)')
-    sum=$(echo $sum+$value | bc)
+    value=$(echo $output_batch | grep -oP '(E2E|Non E2E) (single|batch)_inference_average \K(\d+.\d+)(?=ms)')
+    sum=$((echo $sum+$value))
     ((count++))
     echo $value
 done
 
-metrix=$(echo $output_batch | ggrep -oE '(single|batch)_inference_average')
-echo "$output_single $metrix $(echo "scale=2; $sum/$count" | bc)ms"
+metrix=$(echo $output_batch | grep -oE '(single|batch)_inference_average')
+echo "$output_single $metrix $((echo "$sum/$count"))ms"
