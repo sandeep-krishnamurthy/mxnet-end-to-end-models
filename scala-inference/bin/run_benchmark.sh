@@ -40,10 +40,9 @@ $use_gpu)
 sum=0.0
 count=0
 # the defualt value is 20 so tha we have enough CPU and GPU memory
-num_iter=$((echo $3/25))
+num_iter=$(($3/25))
 num_runs=25
-if [ $3 < 25]; then :q
-=$3; fi
+if [ $3 < 25]; then num_runs=$3; fi
 if [ $num_iter = 0 ]; then num_iter=1; fi
 for n in `seq 1 $num_iter`
 do

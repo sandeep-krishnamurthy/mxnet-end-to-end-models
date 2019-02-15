@@ -1,26 +1,22 @@
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
 #!/bin/bash
-set -ex
+set -e
 
-hw_type=cpu
-if [[ $1 = gpu ]]
+if [[ $2 = gpu ]]
 then
     hw_type=gpu
+    use_gpu="--use-gpu"
+else
+    hw_type=cpu
+    use_gpu=""
+fi
+
+if [[ $1 = e2e ]]
+then
+    model_path="../models/end_to_end_model/resnet18_end_to_end"
+    end_to_end="--end-to-end"
+else
+    model_path="../models/not_end_to_end_model/resnet18_v1"
+    end_to_end=""
 fi
 
 SCALA_VERSION_PROFILE=2.11
@@ -33,9 +29,36 @@ CURR_DIR=$(cd $(dirname $0)/../; pwd)
 
 CLASSPATH=$CLASSPATH:$CURR_DIR/target/*:$CLASSPATH:$CURR_DIR/target/dependency/*:$CLASSPATH:$CURR_DIR/target/classes/lib/*
 
-java -Xmx8G  -cp $CLASSPATH mxnet.EndToEndModelWoPreprocessing \
---model-path-prefix ../models/end_to_end_model/resnet18_end_to_end \
---num-runs 5 \
---batchsize 25 \
---warm-up 2 \
---end-to-end
+output_single=$(java -Xmx8G  -cp $CLASSPATH mxnet.EndToEndModelWoPreprocessing \
+--model-path-prefix $model_path \
+--num-runs $3 \
+--batchsize 1 \
+--warm-up 5 \
+$end_to_end \
+$use_gpu)
+
+sum=0.0
+count=0
+# the defualt value is 20 so tha we have enough CPU and GPU memory
+num_iter=$(($3/25))
+num_runs=25
+if [ $3 < 25]; then num_runs=$3; fi
+if [ $num_iter = 0 ]; then num_iter=1; fi
+for n in `seq 1 $num_iter`
+do
+    output_batch=$(java -Xmx8G  -cp $CLASSPATH mxnet.EndToEndModelWoPreprocessing \
+    --model-path-prefix $model_path \
+    --num-runs $num_runs \
+    --batchsize 25 \
+    --warm-up 1 \
+    $end_to_end \
+    $use_gpu)
+    value=$(echo $output_batch | grep -oP '(E2E|Non E2E) (single|batch)_inference_average \K(\d+.\d+)(?=ms)')
+    # use awk to support float calculation
+    sum=$(awk "BEGIN {print $sum+$value}")
+    count=$(awk "BEGIN {print $count+1})
+    echo $value
+done
+
+metrix=$(echo $output_batch | grep -oE '(single|batch)_inference_average')
+echo "$output_single $metrix $(awk "BEGIN {print $sum/$count}")ms"
