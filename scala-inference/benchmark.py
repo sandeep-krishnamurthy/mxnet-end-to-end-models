@@ -23,6 +23,33 @@ def download_model(model_name, model_path):
     except Exception as e:
         print("ERROR: Failed to download the models. {}".format(e))
 
+def run_inference(iterations, model_path, end_to_end, use_gpus):
+    sum_result = 0.0
+    # the defualt value is 20 so tha we have enough CPU and GPU memory
+    num_iter_batch = 20 if args.iterations > 20 else args.iterations
+    num_iter = iterations // num_iter_batch if args.iterations > num_iter_batch else 1
+    for i in range(num_iter):
+        try:
+            output = subprocess.check_output('java -Xmx8G  -cp {} '
+            'mxnet.EndToEndModelWoPreprocessing '
+            '--model-path-prefix {} '
+            '--num-runs {} '
+            '--batchsize {} '
+            '--warm-up {} '
+            ' {} {}'.format(CLASSPATH, model_path, num_iter_batch, 25, 5, 
+                '--end-to-end' if end_to_end else '',
+                '--use-gpu' if int(use_gpus) > 0 else ''),
+            stderr=subprocess.STDOUT,
+            shell=True).decode(sys.stdout.encoding)
+            res = re.search('(E2E|Non E2E)\n(single|batch)_inference_average (\d+.\d+)ms', output)
+            sum_result += float(res.group(3))
+        except subprocess.CalledProcessError as e:
+            print(e.output.decode(sys.stdout.encoding))
+            exit()
+
+    print('{} {}_inference_average {}ms'
+        .format(res.group(1), res.group(2), sum_result / num_iter))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Run a E2E bechmark task.")
@@ -38,27 +65,8 @@ if __name__ == '__main__':
     # setup the maven
     # hw_type = 'gpu' if int(args.use_gpus) > 0 else 'cpu'
     # subprocess.run(['./mvnw', 'clean install dependency:copy-dependencies package -Dmxnet.hw_type={} -Dmxnet.scalaprofile={} -Dmxnet.version={}'.format(hw_type, SCALA_VERSION_PROFILE, MXNET_VERSION)])
-    sum_result = 0.0
-    # the defualt value is 20 so tha we have enough CPU and GPU memory
-    num_iter_batch = 20 if args.iterations > 20 else args.iterations
-    num_iter = args.iterations // num_iter_batch if args.iterations > num_iter_batch else 1
-    for i in range(num_iter):
-        try:
-            output = subprocess.check_output('java -Xmx8G  -cp {} '
-            'mxnet.EndToEndModelWoPreprocessing '
-            '--model-path-prefix {} '
-            '--num-runs {} '
-            '--batchsize {} '
-            '--warm-up {} '
-            ' {}'.format(CLASSPATH, args.model_path, num_iter_batch, 25, 5, '--end-to-end' if args.end_to_end else ''),
-            stderr=subprocess.STDOUT,
-            shell=True).decode(sys.stdout.encoding)
-            print(output)
-            res = re.search('(E2E|Non E2E)\n(single|batch)_inference_average (\d+.\d+)ms', output)
-            sum_result += float(res.group(3))
-        except subprocess.CalledProcessError as e:
-            print(e.output.decode(sys.stdout.encoding))
-            exit()
 
-    print('{} {}_inference_average {}ms'
-        .format(res.group(1), res.group(2), sum_result / num_iter))
+    # single inference
+    run_inference(1, args.model_path, args.end_to_end, args.use_gpus)
+    # batch inference
+    run_inference(args.iterations, args.model_path, args.end_to_end, args.use_gpus)
