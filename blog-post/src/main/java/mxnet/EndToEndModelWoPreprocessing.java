@@ -30,32 +30,13 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.BufferedReader;
 
-/**
- * Benchmark resnet18 and resnet_end_to_end model for single / batch inference
- * and CPU / GPU
- */
 public class EndToEndModelWoPreprocessing {
     static NDArray$ NDArray = NDArray$.MODULE$;
 
     @Option(name = "--model-path-prefix", usage = "input model directory and prefix of the model")
     private String modelPathPrefix = "resnet18_v1";
-    @Option(name = "--num-runs", usage = "Number of runs")
-    private int numOfRuns = 1;
-    @Option(name = "--batchsize", usage = "batch size")
-    private int batchSize = 25;
-    @Option(name = "--warm-up", usage = "warm up iteration")
-    private int timesOfWarmUp = 5;
     @Option(name = "--use-gpu", usage = "use gpu or cpu")
     private boolean useGPU = false;
-
-    private static void printAvg(double[] inferenceTimes, String metricsPrefix, int batchSize)  {
-        double sum = 0.0;
-        for (double time: inferenceTimes) {
-            sum += time;
-        }
-        double average = sum / (batchSize * inferenceTimes.length);
-        System.out.println(String.format("%s_average %1.2fms",metricsPrefix, average));
-    }
 
     private static String printMaximumClass(double[] probabilities,
                                             String modelPathPrefix) throws IOException {
@@ -81,42 +62,27 @@ public class EndToEndModelWoPreprocessing {
         return "Probability : " + probabilities[maxIdx] + " Class : " + list.get(maxIdx) ;
     }
 
-    private static void runInference(String modelPathPrefix, List<Context> context, int batchSize, int numOfRuns, int timesOfWarmUp) {
+    private static void runInference(String modelPathPrefix, List<Context> context) {
         Shape inputShape;
         List<DataDesc> inputDescriptors = new ArrayList<>();
         inputShape = new Shape(new int[]{1, 576, 1024, 3});
         inputDescriptors.add(new DataDesc("data", inputShape, DType.UInt8(), "NHWC"));
-        Predictor predictor = new Predictor(modelPathPrefix, inputDescriptors, context,0);
+        Predictor predictor = new Predictor(modelPathPrefix, inputDescriptors, context, 0);
 
-        double[] times = new double[numOfRuns];
-
-        for (int n = 0; n < numOfRuns + timesOfWarmUp; n++) {
-            try(ResourceScope scope = new ResourceScope()) {
-                NDArray img = Image.imRead("Pug-Cookie.jpg", 1, true);
-                img = NDArray.expand_dims(img, 0, null)[0];    
-                Long curretTime = 0l;
-                // time the latency after warmup
-                if (n >= timesOfWarmUp) {
-                    curretTime = System.nanoTime();
-                }
-                img.asInContext(context.get(0));
-                List<NDArray> input = new ArrayList<>();
-                input.add(img);
-                List<NDArray> output = predictor.predictWithNDArray(input, 5);
-                output.get(0).waitToRead();
-                try {
-                    System.out.println(printMaximumClass(output.get(0).toFloat64Array(), modelPathPrefix));
-                } catch (IOException e) {
-                    System.err.println(e);
-                }
-                if (n >= timesOfWarmUp) {
-                    times[n - timesOfWarmUp] = (System.nanoTime() - curretTime) / (1e6 * 1.0);
-                }
-                
+        try(ResourceScope scope = new ResourceScope()) {
+            NDArray img = Image.imRead("Pug-Cookie.jpg", 1, true);
+            img = NDArray.expand_dims(img, 0, null)[0];    
+            img.asInContext(context.get(0));
+            List<NDArray> input = new ArrayList<>();
+            input.add(img);
+            List<NDArray> output = predictor.predictWithNDArray(input, 5);
+            output.get(0).waitToRead();
+            try {
+                System.out.println(printMaximumClass(output.get(0).toFloat64Array(), modelPathPrefix));
+            } catch (IOException e) {
+                System.err.println(e);
             }
-
         }
-        printAvg(times, (batchSize > 1) ? "batch_inference" : "single_inference", batchSize);
     }
 
     public static void main(String[] args) {
@@ -133,6 +99,6 @@ public class EndToEndModelWoPreprocessing {
         List<Context> context = new ArrayList<Context>();
         context.add((inst.useGPU) ? Context.gpu() : Context.cpu());
 
-        runInference(inst.modelPathPrefix, context, inst.batchSize, inst.numOfRuns, inst.timesOfWarmUp);
+        runInference(inst.modelPathPrefix, context);
     }
 }

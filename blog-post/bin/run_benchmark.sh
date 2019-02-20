@@ -9,5 +9,4 @@ java -Xmx8G  -cp $CLASSPATH mxnet.EndToEndModelWoPreprocessing \
 --model-path-prefix models/resnet18_v1_end_to_end \
 --num-runs 1 \
 --batchsize 1 \
---warm-up 0 \
---end-to-end
+--warm-up 0
