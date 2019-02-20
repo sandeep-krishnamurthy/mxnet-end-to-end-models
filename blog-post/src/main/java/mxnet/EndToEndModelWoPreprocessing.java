@@ -75,7 +75,7 @@ public class EndToEndModelWoPreprocessing {
             img.asInContext(context.get(0));
             List<NDArray> input = new ArrayList<>();
             input.add(img);
-            List<NDArray> output = predictor.predictWithNDArray(input, 5);
+            List<NDArray> output = predictor.predictWithNDArray(input);
             output.get(0).waitToRead();
             try {
                 System.out.println(printMaximumClass(output.get(0).toFloat64Array(), modelPathPrefix));
