@@ -48,10 +48,8 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.mxnet</groupId>
-      <artifactId>mxnet-full_2.11-INTERNAL</artifactId>
-      <version>1.5.0</version>
-      <scope>system</scope>
-      <systemPath>/Users/leecheng/workspace/mxnet-end-to-end-models/blog-post/mxnet-full_2.11-INTERNAL.jar</systemPath>
+      <artifactId>mxnet-full_${mxnet.scalaprofile}-${mxnet.profile}</artifactId>
+      <version>${mxnet.version}</version>
     </dependency>
   </dependencies>
 

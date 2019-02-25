@@ -38,8 +38,8 @@ public class EndToEndModelWoPreprocessing {
     @Option(name = "--use-gpu", usage = "use gpu or cpu")
     private boolean useGPU = false;
 
-    private static String printMaximumClass(double[] probabilities,
-                                            String modelPathPrefix) throws IOException {
+    private static String getClassName(double[] scores,
+                                            String modelPathPrefix) throws IOException {                                     
         String synsetFilePath = modelPathPrefix.substring(0,
                 1 + modelPathPrefix.lastIndexOf(File.separator)) + "/synset.txt";
         BufferedReader reader = new BufferedReader(new FileReader(synsetFilePath));
@@ -53,13 +53,13 @@ public class EndToEndModelWoPreprocessing {
         reader.close();
 
         int maxIdx = 0;
-        for (int i = 1;i<probabilities.length;i++) {
-            if (probabilities[i] > probabilities[maxIdx]) {
+        for (int i = 1;i < scores.length; i++) {
+            if (scores[i] > scores[maxIdx]) {
                 maxIdx = i;
             }
         }
 
-        return "Probability : " + probabilities[maxIdx] + " Class : " + list.get(maxIdx) ;
+        return "Class : " + list.get(maxIdx) ;
     }
 
     private static void runInference(String modelPathPrefix, List<Context> context) {
@@ -78,7 +78,7 @@ public class EndToEndModelWoPreprocessing {
             List<NDArray> output = predictor.predictWithNDArray(input);
             output.get(0).waitToRead();
             try {
-                System.out.println(printMaximumClass(output.get(0).toFloat64Array(), modelPathPrefix));
+                System.out.println(getClassName(output.get(0).toFloat64Array(), modelPathPrefix));
             } catch (IOException e) {
                 System.err.println(e);
             }
